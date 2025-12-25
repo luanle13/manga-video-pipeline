@@ -1,0 +1,66 @@
+version: '3.8'
+
+services:
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+
+  app:
+    build: .
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - REDIS_URL=redis://redis:6379
+      - DATABASE_URL=sqlite:///./manga_pipeline.db
+    depends_on:
+      - redis
+      - db
+    volumes:
+      - ./data:/app/data
+      - ./.env:/app/.env
+    command: uvicorn src.dashboard.main:app --host 0.0.0.0 --port 8000 --reload
+
+  celery-worker:
+    build: .
+    restart: unless-stopped
+    environment:
+      - REDIS_URL=redis://redis:6379
+      - DATABASE_URL=sqlite:///./manga_pipeline.db
+    depends_on:
+      - redis
+      - db
+    volumes:
+      - ./data:/app/data
+      - ./.env:/app/.env
+    command: celery -A src.scheduler.celery_app worker --loglevel=info
+
+  celery-beat:
+    build: .
+    restart: unless-stopped
+    environment:
+      - REDIS_URL=redis://redis:6379
+      - DATABASE_URL=sqlite:///./manga_pipeline.db
+    depends_on:
+      - redis
+      - db
+    volumes:
+      - ./.env:/app/.env
+    command: celery -A src.scheduler.celery_app beat --loglevel=info
+
+  db:
+    image: sqlite:latest
+    restart: unless-stopped
+    volumes:
+      - db_data:/var/lib/sqlite
+    ports:
+      - "5432:5432"  # Using port 5432 for compatibility if switching to PostgreSQL later
+
+volumes:
+  redis_data:
+  db_data:
