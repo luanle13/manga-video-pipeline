@@ -1,55 +1,66 @@
-# Multi-stage Dockerfile for manga video pipeline
+# Multi-stage build for manga video pipeline
+FROM python:3.13-slim as builder
 
-# Build stage for dependencies
-FROM python:3.13-slim AS builder
-
+# Install system dependencies
 RUN apt-get update && apt-get install -y \
     gcc \
     g++ \
+    curl \
+    wget \
+    gnupg \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Python dependencies
-COPY requirements.txt .
-RUN pip install --user --no-cache-dir -r requirements.txt
+# Set working directory
+WORKDIR /app
 
-# Install Playwright dependencies
-RUN playwright install chromium --with-deps
+# Copy requirements first to leverage Docker layer caching
+COPY requirements.txt .
+
+# Install Python dependencies
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir -r requirements.txt
+
+# Install Playwright browsers
+RUN playwright install chromium firefox webkit
 
 
 # Production stage
 FROM python:3.13-slim
 
-# Install system dependencies needed for the application
+# Install runtime dependencies
 RUN apt-get update && apt-get install -y \
     ffmpeg \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy installed Python packages from builder stage
-COPY --from=builder /root/.local /root/.local
-
 # Create non-root user
 RUN groupadd -r appuser && useradd -r -g appuser appuser
+
+# Set working directory
 WORKDIR /app
 
-# Copy application source code
+# Copy Python environment from builder stage
+COPY --from=builder /usr/local/lib/python3.13 /usr/local/lib/python3.13
+COPY --from=builder /usr/local/bin /usr/local/bin
+
+# Copy application code
 COPY . .
 
-# Set PATH to include user-installed packages
-ENV PATH=/root/.local/bin:$PATH
-ENV PYTHONPATH=/app/src:$PYTHONPATH
-
-# Create necessary directories
-RUN mkdir -p /app/data /app/logs && chown -R appuser:appuser /app
-RUN chmod -R 755 /app/data /app/logs
-
-# Install Playwright browsers
-RUN playwright install chromium --with-deps
+# Change ownership to non-root user
+RUN chown -R appuser:appuser /app
 
 # Switch to non-root user
 USER appuser
 
+# Expose port
 EXPOSE 8000
 
-# Command to run the application (will be overridden by docker-compose for specific services)
-CMD ["uvicorn", "src.dashboard.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Create data directory for persistent storage
+RUN mkdir -p /app/data && chmod 755 /app/data
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost:8000/health || exit 1
+
+# Start command
+CMD ["uvicorn", "src.dashboard.app:app", "--host", "0.0.0.0", "--port", "8000"]

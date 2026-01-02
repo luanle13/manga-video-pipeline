@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - Manga Video Pipeline{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <div class="mb-8">
+        <h1 class="text-3xl font-bold text-gray-900">Dashboard</h1>
+        <p class="mt-2 text-gray-600">Monitor your manga video pipeline processes</p>
+    </div>
+
+    <!-- Stats Section -->
+    <div id="stats-container" hx-get="/components/stats" hx-trigger="load, every 30s" class="mb-8">
+        <!-- Stats will be loaded here by HTMX -->
+    </div>
+
+    <!-- Platform Health Section -->
+    <div id="platform-health-container" hx-get="/components/platform-health" hx-trigger="load, every 30s" class="mb-8">
+        <!-- Platform health will be loaded here by HTMX -->
+    </div>
+
+    <!-- Pipeline Runs Section -->
+    <div class="mb-8">
+        <div class="flex justify-between items-center mb-4">
+            <h2 class="text-xl font-semibold text-gray-900">Recent Pipeline Runs</h2>
+            <div class="flex space-x-2">
+                <button 
+                    hx-get="/components/pipeline-list" 
+                    hx-trigger="click" 
+                    hx-target="#pipeline-list-container"
+                    class="bg-white border border-gray-300 text-gray-700 px-3 py-2 rounded-md text-sm font-medium hover:bg-gray-50">
+                    Refresh
+                </button>
+            </div>
+        </div>
+        <div id="pipeline-list-container" hx-get="/components/pipeline-list" hx-trigger="load, every 30s">
+            <!-- Pipeline list will be loaded here by HTMX -->
+        </div>
+    </div>
+
+    <!-- Upload Status Section -->
+    <div class="mb-8">
+        <div class="flex justify-between items-center mb-4">
+            <h2 class="text-xl font-semibold text-gray-900">Upload Status</h2>
+            <div class="flex space-x-2">
+                <button 
+                    hx-get="/components/upload-status" 
+                    hx-trigger="click" 
+                    hx-target="#upload-status-container"
+                    class="bg-white border border-gray-300 text-gray-700 px-3 py-2 rounded-md text-sm font-medium hover:bg-gray-50">
+                    Refresh
+                </button>
+            </div>
+        </div>
+        <div id="upload-status-container" hx-get="/components/upload-status" hx-trigger="load, every 30s">
+            <!-- Upload status will be loaded here by HTMX -->
+        </div>
+    </div>
+</div>
+{% endblock %}

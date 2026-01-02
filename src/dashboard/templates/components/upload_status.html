@@ -1,0 +1,51 @@
+<div class="bg-white shadow overflow-hidden sm:rounded-md">
+    <ul class="divide-y divide-gray-200">
+        {% for upload in uploads %}
+        <li>
+            <div class="px-4 py-4 sm:px-6">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center">
+                        <p class="text-sm font-medium text-gray-900 truncate">{{ upload.title }}</p>
+                        <p class="ml-2 text-sm text-gray-500 truncate">{{ upload.platform }}</p>
+                    </div>
+                    <div class="flex items-center">
+                        <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
+                                     {% if upload.status == 'completed' %}status-completed
+                                     {% elif upload.status == 'failed' %}status-failed
+                                     {% elif upload.status == 'in_progress' %}status-in-progress
+                                     {% else %}status-pending
+                                     {% endif %}">
+                            {{ upload.status.title() }}
+                        </span>
+                        {% if upload.status == 'failed' %}
+                        <button 
+                            hx-post="/api/retry/upload/{{ upload.id }}"
+                            hx-target="#messages"
+                            hx-swap="innerHTML"
+                            class="ml-2 bg-red-100 hover:bg-red-200 text-red-800 px-2 py-1 rounded text-xs font-medium"
+                            title="Retry upload">
+                            Retry
+                        </button>
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="mt-2 sm:flex sm:justify-between">
+                    <div class="sm:flex">
+                        <p class="flex items-center text-sm text-gray-500">
+                            {{ upload.upload_date }}
+                        </p>
+                        {% if upload.error_message %}
+                        <p class="mt-2 flex items-center text-sm text-red-500 sm:mt-0 sm:ml-6">
+                            <svg class="flex-shrink-0 mr-1.5 h-5 w-5 text-red-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd" />
+                            </svg>
+                            {{ upload.error_message }}
+                        </p>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </li>
+        {% endfor %}
+    </ul>
+</div>

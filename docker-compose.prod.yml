@@ -1,0 +1,126 @@
+version: '3.8'
+
+services:
+  app:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=sqlite:///./data/manga_pipeline.db
+      - REDIS_URL=redis://redis:6379/0
+      - PYTHONPATH=/app
+    volumes:
+      - ./data:/app/data
+    restart: unless-stopped
+    depends_on:
+      - redis
+    networks:
+      - manga-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '1.0'
+        reservations:
+          memory: 512M
+          cpus: '0.5'
+
+  celery-worker:
+    build: .
+    command: celery -A src.celery_app worker --loglevel=info
+    environment:
+      - DATABASE_URL=sqlite:///./data/manga_pipeline.db
+      - REDIS_URL=redis://redis:6379/0
+      - PYTHONPATH=/app
+    volumes:
+      - ./data:/app/data
+    restart: unless-stopped
+    depends_on:
+      - redis
+      - app
+    networks:
+      - manga-network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+          cpus: '1.5'
+        reservations:
+          memory: 1G
+          cpus: '0.75'
+
+  celery-beat:
+    build: .
+    command: celery -A src.celery_app beat --loglevel=info
+    environment:
+      - DATABASE_URL=sqlite:///./data/manga_pipeline.db
+      - REDIS_URL=redis://redis:6379/0
+      - PYTHONPATH=/app
+    volumes:
+      - ./data:/app/data
+    restart: unless-stopped
+    depends_on:
+      - redis
+      - app
+    networks:
+      - manga-network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.5'
+        reservations:
+          memory: 256M
+          cpus: '0.25'
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+    networks:
+      - manga-network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.5'
+        reservations:
+          memory: 256M
+          cpus: '0.25'
+    command: redis-server --appendonly yes
+
+networks:
+  manga-network:
+    driver: bridge
+
+volumes:
+  redis_data:

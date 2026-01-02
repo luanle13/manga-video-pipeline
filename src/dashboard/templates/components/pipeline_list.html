@@ -1,0 +1,36 @@
+<div class="bg-white shadow overflow-hidden sm:rounded-md">
+    <ul class="divide-y divide-gray-200">
+        {% for run in pipelines %}
+        <li>
+            <div class="px-4 py-4 sm:px-6">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center">
+                        <p class="text-sm font-medium text-blue-600 truncate">{{ run.manga_title }}</p>
+                        <p class="ml-2 text-sm text-gray-500 truncate">Ch. {{ run.chapter_number }}</p>
+                    </div>
+                    <div class="ml-2 flex-shrink-0 flex">
+                        <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
+                                     {% if run.status == 'completed' %}status-completed
+                                     {% elif run.status == 'failed' %}status-failed
+                                     {% elif run.status == 'in_progress' %}status-in-progress
+                                     {% else %}status-pending
+                                     {% endif %}">
+                            {{ run.status.title() }}
+                        </span>
+                    </div>
+                </div>
+                <div class="mt-2 sm:flex sm:justify-between">
+                    <div class="sm:flex">
+                        <p class="flex items-center text-sm text-gray-500">
+                            Started: {{ run.started_at }}
+                        </p>
+                        <p class="mt-2 flex items-center text-sm text-gray-500 sm:mt-0 sm:ml-6">
+                            Duration: {{ run.duration }}s
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </li>
+        {% endfor %}
+    </ul>
+</div>

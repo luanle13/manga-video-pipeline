@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Manga Video Pipeline Dashboard{% endblock %}</title>
+    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+    <script src="https://unpkg.com/htmx.org@1.9.10/dist/ext/ws.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#3B82F6',
+                        secondary: '#10B981',
+                        danger: '#EF4444',
+                        warning: '#F59E0B',
+                    }
+                }
+            }
+        }
+    </script>
+    <style type="text/tailwindcss">
+        @layer utilities {
+            .status-active { @apply bg-green-100 text-green-800; }
+            .status-inactive { @apply bg-red-100 text-red-800; }
+            .status-pending { @apply bg-yellow-100 text-yellow-800; }
+            .status-completed { @apply bg-green-100 text-green-800; }
+            .status-failed { @apply bg-red-100 text-red-800; }
+            .status-in-progress { @apply bg-blue-100 text-blue-800; }
+        }
+    </style>
+    {% block head %}{% endblock %}
+</head>
+<body class="bg-gray-50 min-h-screen">
+    <!-- Navigation Header -->
+    <nav class="bg-white shadow">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between h-16">
+                <div class="flex items-center">
+                    <div class="flex-shrink-0 flex items-center">
+                        <svg class="h-8 w-8 text-blue-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                        </svg>
+                        <span class="ml-2 text-xl font-bold text-gray-900">Manga Video Pipeline</span>
+                    </div>
+                    <div class="hidden md:ml-6 md:flex md:space-x-8">
+                        <a href="/" class="border-blue-500 text-gray-900 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium">
+                            Dashboard
+                        </a>
+                        <a href="#" class="border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium">
+                            Pipelines
+                        </a>
+                        <a href="#" class="border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium">
+                            Uploads
+                        </a>
+                        <a href="#" class="border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium">
+                            Settings
+                        </a>
+                    </div>
+                </div>
+                
+                <div class="flex items-center">
+                    <button 
+                        hx-post="/api/trigger/discovery" 
+                        hx-target="#messages"
+                        hx-swap="innerHTML"
+                        class="ml-4 bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-md text-sm font-medium">
+                        Trigger Discovery
+                    </button>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Messages container -->
+    <div id="messages" class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4"></div>
+
+    <!-- Main Content -->
+    <main>
+        {% block content %}{% endblock %}
+    </main>
+
+    <!-- Auto refresh script -->
+    <script>
+        // Set up automatic refresh every 30 seconds for HTMX partials
+        document.addEventListener('DOMContentLoaded', function() {
+            // Set up refresh intervals for different components
+            setInterval(function() {
+                if (document.getElementById('stats-container')) {
+                    htmx.trigger('#stats-container', 'htmx:refresh');
+                }
+            }, 30000); // 30 seconds
+            
+            setInterval(function() {
+                if (document.getElementById('pipeline-list-container')) {
+                    htmx.trigger('#pipeline-list-container', 'htmx:refresh');
+                }
+            }, 30000);
+            
+            setInterval(function() {
+                if (document.getElementById('upload-status-container')) {
+                    htmx.trigger('#upload-status-container', 'htmx:refresh');
+                }
+            }, 30000);
+        });
+    </script>
+</body>
+</html>

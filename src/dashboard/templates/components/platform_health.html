@@ -1,0 +1,35 @@
+<div class="bg-white shadow rounded-lg p-6 mb-8">
+    <h3 class="text-lg font-medium text-gray-900 mb-4">Platform Health Status</h3>
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {% for platform in health %}
+        <div class="border rounded-lg p-4">
+            <div class="flex items-center">
+                <div class="flex-shrink-0">
+                    {% if platform.status == 'healthy' %}
+                    <svg class="h-6 w-6 text-green-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                    </svg>
+                    {% else %}
+                    <svg class="h-6 w-6 text-red-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                    {% endif %}
+                </div>
+                <div class="ml-3">
+                    <h4 class="text-sm font-medium text-gray-900">{{ platform.platform }}</h4>
+                    <p class="text-sm text-gray-500">Response: {{ platform.response_time }}ms</p>
+                </div>
+            </div>
+            <div class="mt-2">
+                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium 
+                             {% if platform.status == 'healthy' %}bg-green-100 text-green-800
+                             {% else %}bg-red-100 text-red-800
+                             {% endif %}">
+                    {{ platform.status.title() }}
+                </span>
+                <p class="mt-1 text-xs text-gray-500">Last checked: {{ platform.last_check }}</p>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
