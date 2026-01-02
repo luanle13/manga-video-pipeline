@@ -60,3 +60,15 @@ manga-pipeline = "manga_video_pipeline.cli:main"
 [project.urls]
 Homepage = "https://github.com/rowanlee/manga-video-pipeline"
 Repository = "https://github.com/rowanlee/manga-video-pipeline"
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+testpaths = ["tests"]
+addopts = ["-ra", "--showlocals", "--strict-markers", "--strict-config"]
+markers = [
+    "unit: Unit tests",
+    "integration: Integration tests",
+    "slow: Slow running tests",
+    "external: Tests that rely on external services"
+]
