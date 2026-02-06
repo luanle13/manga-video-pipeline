@@ -1,0 +1,1 @@
+"""Manga fetching module."""
