@@ -1,0 +1,140 @@
+# Terraform Variables Configuration Example
+# Copy this file to terraform.tfvars and update with your values
+#
+# cp terraform.tfvars.example terraform.tfvars
+#
+# WARNING: terraform.tfvars contains sensitive information
+# It is added to .gitignore and should NEVER be committed to version control
+
+# =============================================================================
+# Required Variables
+# =============================================================================
+
+# Your public IP address for SSH and dashboard access
+# Get your IP: curl ifconfig.me
+admin_ip = "203.0.113.0/32"  # CHANGE THIS
+
+# Email for budget and CloudWatch alerts
+budget_alert_email = "your-email@example.com"  # CHANGE THIS
+
+# =============================================================================
+# General Configuration
+# =============================================================================
+
+project_name = "manga-video-pipeline"
+environment  = "prod"
+region       = "ap-southeast-1"  # Singapore
+
+# =============================================================================
+# Network & Security
+# =============================================================================
+
+# Additional IP ranges allowed to access dashboard (optional)
+allowed_ip_ranges = [
+  # "192.0.2.0/24",    # Office network
+  # "198.51.100.0/24"  # Home network
+]
+
+# =============================================================================
+# Monitoring & Budget
+# =============================================================================
+
+monthly_budget_limit       = 100      # USD
+enable_detailed_monitoring = false    # Set to true for production
+
+# =============================================================================
+# DynamoDB Configuration
+# =============================================================================
+
+dynamodb_billing_mode            = "PAY_PER_REQUEST"  # or "PROVISIONED"
+dynamodb_point_in_time_recovery  = true
+
+# =============================================================================
+# S3 Configuration
+# =============================================================================
+
+s3_enable_versioning = true
+
+s3_lifecycle_days = {
+  standard_ia  = 30    # Days before moving to Standard-IA
+  glacier      = 90    # Days before moving to Glacier
+  deep_archive = 365   # Days before moving to Deep Archive
+}
+
+# =============================================================================
+# Lambda Configuration
+# =============================================================================
+
+lambda_runtime = "python3.12"
+
+lambda_memory_size = {
+  manga_fetcher    = 512
+  script_generator = 1024  # LLM processing needs more memory
+  tts_processor    = 512
+}
+
+lambda_timeout = {
+  manga_fetcher    = 300  # 5 minutes
+  script_generator = 600  # 10 minutes
+  tts_processor    = 300  # 5 minutes
+}
+
+lambda_reserved_concurrency = {
+  manga_fetcher    = -1  # Unreserved
+  script_generator = 5   # Limit concurrent LLM API calls
+  tts_processor    = -1  # Unreserved
+}
+
+# =============================================================================
+# EC2 Spot Instance Configuration
+# =============================================================================
+
+spot_instance_type           = "c5.2xlarge"  # 8 vCPU, 16 GB RAM
+spot_max_price              = ""             # Empty = on-demand price
+spot_interruption_behavior  = "terminate"
+ami_name_filter             = "ubuntu/images/hvm-ssd-gp3/ubuntu-noble-24.04-amd64-server-*"
+
+# =============================================================================
+# Dashboard Configuration
+# =============================================================================
+
+dashboard_instance_type     = "t3.micro"  # 2 vCPU, 1 GB RAM
+dashboard_enable_public_ip  = true        # Required for nip.io HTTPS
+
+# =============================================================================
+# Pipeline Configuration
+# =============================================================================
+
+daily_trigger_time = "17:00"  # UTC (midnight Vietnam time)
+enable_daily_trigger = true
+
+daily_quota  = 10
+tts_voice_id = "vi-VN-HoaiMyNeural"  # or "vi-VN-NamMinhNeural"
+script_style = "chapter_walkthrough"  # or "detailed_review" or "summary"
+
+# =============================================================================
+# Secrets Manager Secret Names
+# =============================================================================
+
+deepinfra_api_key_secret_name  = "manga-pipeline/deepinfra-api-key"
+admin_credentials_secret_name  = "manga-pipeline/admin-credentials"
+jwt_secret_name                = "manga-pipeline/jwt-secret"
+
+# =============================================================================
+# Feature Flags
+# =============================================================================
+
+enable_spot_interruption_handling = true
+enable_cleanup_lambda            = true
+enable_cost_allocation_tags      = true
+
+# =============================================================================
+# Additional Tags
+# =============================================================================
+
+additional_tags = {
+  Team        = "DevOps"
+  CostCenter  = "Engineering"
+  Compliance  = "None"
+  Backup      = "Daily"
+}
