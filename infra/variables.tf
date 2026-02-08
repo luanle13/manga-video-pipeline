@@ -273,6 +273,18 @@ variable "deepinfra_api_key_secret_name" {
   default     = "manga-pipeline/deepinfra-api-key"
 }
 
+variable "youtube_credentials_secret_name" {
+  description = "Secrets Manager secret name for YouTube OAuth credentials"
+  type        = string
+  default     = "manga-pipeline/youtube-credentials"
+}
+
+variable "mangadex_secret_name" {
+  description = "Secrets Manager secret name for MangaDex credentials (if needed)"
+  type        = string
+  default     = "manga-pipeline/mangadex-credentials"
+}
+
 variable "admin_credentials_secret_name" {
   description = "Secrets Manager secret name for dashboard admin credentials"
   type        = string

@@ -46,6 +46,45 @@ output "storage_summary" {
 }
 
 # =============================================================================
+# IAM Role Outputs
+# =============================================================================
+
+output "lambda_role_arns" {
+  description = "Map of Lambda execution role ARNs"
+  value       = module.security.lambda_role_arns
+}
+
+output "lambda_role_names" {
+  description = "Map of Lambda execution role names"
+  value       = module.security.lambda_role_names
+}
+
+output "ec2_instance_profile_arns" {
+  description = "Map of EC2 instance profile ARNs"
+  value       = module.security.ec2_instance_profile_arns
+}
+
+output "ec2_instance_profile_names" {
+  description = "Map of EC2 instance profile names"
+  value       = module.security.ec2_instance_profile_names
+}
+
+output "step_functions_role_arn" {
+  description = "ARN of the Step Functions execution role"
+  value       = module.security.step_functions_role_arn
+}
+
+output "eventbridge_role_arn" {
+  description = "ARN of the EventBridge execution role"
+  value       = module.security.eventbridge_role_arn
+}
+
+output "security_summary" {
+  description = "Summary of IAM roles created"
+  value       = module.security.security_summary
+}
+
+# =============================================================================
 # Future Infrastructure Outputs (to be implemented)
 # =============================================================================
 # Lambda functions, Step Functions, EC2, EventBridge, Secrets Manager,
