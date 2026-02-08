@@ -13,7 +13,13 @@ from src.common.logging_config import setup_logger
 from src.common.secrets import SecretsClient
 from src.dashboard.auth import AuthMiddleware
 from src.dashboard.csrf import CSRFManager
-from src.dashboard.routes import auth_routes, queue_routes, settings_routes, stats_routes
+from src.dashboard.routes import (
+    auth_routes,
+    manga_routes,
+    queue_routes,
+    settings_routes,
+    stats_routes,
+)
 
 logger = setup_logger(__name__)
 
@@ -82,6 +88,7 @@ def create_app(
     settings_routes.set_templates(templates)
     queue_routes.set_templates(templates)
     stats_routes.set_templates(templates)
+    manga_routes.set_templates(templates)
 
     # Mount static files
     static_dir = Path(__file__).parent / "static"
@@ -101,6 +108,7 @@ def create_app(
     app.include_router(stats_routes.router)
     app.include_router(settings_routes.router)
     app.include_router(queue_routes.router)
+    app.include_router(manga_routes.router)
 
     logger.info(
         "FastAPI application created",

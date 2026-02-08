@@ -1,0 +1,140 @@
+{% extends "base.html" %}
+
+{% block title %}Processed Manga - Manga Video Pipeline{% endblock %}
+
+{% block content %}
+<h1>Processed Manga</h1>
+
+<div class="card">
+    <p style="color: #666; margin-bottom: 1.5rem;">
+        Browse all manga that have been successfully processed and uploaded to YouTube.
+    </p>
+
+    <!-- Manga Table -->
+    <table id="manga-table">
+        <thead>
+            <tr>
+                <th>Manga Title</th>
+                <th>Chapter</th>
+                <th>Processed Date</th>
+                <th>YouTube Link</th>
+                <th>Status</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td colspan="5" style="text-align: center; padding: 2rem;">Loading...</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <!-- Pagination -->
+    <div class="pagination">
+        <button id="prevPage" onclick="previousPage()" disabled>← Previous</button>
+        <span id="pageInfo" style="padding: 0.5rem 1rem;">Page 1</span>
+        <button id="nextPage" onclick="nextPage()" disabled>Next →</button>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    let currentPage = 1;
+    let totalPages = 1;
+
+    // Load processed manga
+    async function loadManga() {
+        try {
+            const params = new URLSearchParams({
+                page: currentPage,
+                page_size: 20,
+                status_filter: 'completed' // Only show completed jobs
+            });
+
+            const response = await fetch(`/api/queue?${params}`, {
+                credentials: 'include'
+            });
+
+            if (!response.ok) {
+                throw new Error('Failed to load manga');
+            }
+
+            const data = await response.json();
+            const tbody = document.querySelector('#manga-table tbody');
+
+            if (data.jobs.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; color: #666;">No processed manga found</td></tr>';
+                updatePaginationControls(0);
+                return;
+            }
+
+            // Group by manga_id and show unique manga
+            const mangaMap = new Map();
+            data.jobs.forEach(job => {
+                if (!mangaMap.has(job.manga_id)) {
+                    mangaMap.set(job.manga_id, []);
+                }
+                mangaMap.get(job.manga_id).push(job);
+            });
+
+            tbody.innerHTML = data.jobs.map(job => `
+                <tr>
+                    <td><strong>${job.manga_title}</strong></td>
+                    <td>
+                        ${job.chapter_number ? `Chapter ${job.chapter_number}` : '-'}
+                    </td>
+                    <td>${formatDateTime(job.updated_at)}</td>
+                    <td>
+                        ${job.youtube_url
+                            ? `<a href="${job.youtube_url}" target="_blank" style="color: var(--accent);">
+                                 📺 Watch on YouTube
+                               </a>`
+                            : '-'}
+                    </td>
+                    <td>
+                        <span class="badge ${job.status}">${job.status}</span>
+                    </td>
+                </tr>
+            `).join('');
+
+            updatePaginationControls(data.total);
+        } catch (error) {
+            console.error('Error loading manga:', error);
+            const tbody = document.querySelector('#manga-table tbody');
+            tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; color: var(--danger);">Error loading data</td></tr>';
+        }
+    }
+
+    // Update pagination controls
+    function updatePaginationControls(total) {
+        const pageSize = 20;
+        totalPages = Math.ceil(total / pageSize);
+
+        document.getElementById('prevPage').disabled = currentPage === 1;
+        document.getElementById('nextPage').disabled = currentPage >= totalPages || totalPages === 0;
+        document.getElementById('pageInfo').textContent = totalPages > 0
+            ? `Page ${currentPage} of ${totalPages}`
+            : 'No results';
+    }
+
+    // Pagination functions
+    function previousPage() {
+        if (currentPage > 1) {
+            currentPage--;
+            loadManga();
+        }
+    }
+
+    function nextPage() {
+        if (currentPage < totalPages) {
+            currentPage++;
+            loadManga();
+        }
+    }
+
+    // Initialize
+    document.addEventListener('DOMContentLoaded', () => {
+        loadManga();
+    });
+</script>
+{% endblock %}

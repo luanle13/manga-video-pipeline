@@ -1,52 +1,158 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dashboard - Manga Video Pipeline Admin</title>
-</head>
-<body>
-    <header>
-        <h1>Manga Video Pipeline Admin</h1>
-        <p>Welcome, {{ username }}!</p>
-        <form method="POST" action="/api/auth/logout">
-            <button type="submit">Logout</button>
-        </form>
-    </header>
+{% extends "base.html" %}
 
-    <main>
-        <h2>Statistics</h2>
-        <div class="stats">
-            <div class="stat">
-                <h3>Videos Today</h3>
-                <p>{{ stats.videos_today }}</p>
-            </div>
-            <div class="stat">
-                <h3>Total Videos</h3>
-                <p>{{ stats.videos_total }}</p>
-            </div>
-            <div class="stat">
-                <h3>Failed Videos</h3>
-                <p>{{ stats.videos_failed }}</p>
-            </div>
-            <div class="stat">
-                <h3>Pending Videos</h3>
-                <p>{{ stats.videos_pending }}</p>
-            </div>
-            <div class="stat">
-                <h3>Avg Render Time</h3>
-                <p>{{ "%.1f"|format(stats.avg_render_time_minutes) if stats.avg_render_time_minutes else "N/A" }} min</p>
-            </div>
-            <div class="stat">
-                <h3>Daily Quota</h3>
-                <p>{{ stats.quota_remaining }} / {{ stats.daily_quota }}</p>
-            </div>
+{% block title %}Dashboard - Manga Video Pipeline{% endblock %}
+
+{% block content %}
+<h1>Dashboard</h1>
+
+<!-- Stats Cards -->
+<div class="stats-grid">
+    <div class="stat-card">
+        <h3>Videos Today</h3>
+        <div class="value" id="videos-today">{{ stats.videos_today }}</div>
+    </div>
+    <div class="stat-card">
+        <h3>Total Videos</h3>
+        <div class="value" id="videos-total">{{ stats.videos_total }}</div>
+    </div>
+    <div class="stat-card">
+        <h3>Failed Videos</h3>
+        <div class="value" id="videos-failed">{{ stats.videos_failed }}</div>
+    </div>
+    <div class="stat-card">
+        <h3>Pending Videos</h3>
+        <div class="value" id="videos-pending">{{ stats.videos_pending }}</div>
+    </div>
+    <div class="stat-card">
+        <h3>Avg Render Time</h3>
+        <div class="value" id="avg-render-time">
+            {% if stats.avg_render_time_minutes %}
+                {{ "%.1f"|format(stats.avg_render_time_minutes) }} min
+            {% else %}
+                N/A
+            {% endif %}
         </div>
+    </div>
+    <div class="stat-card">
+        <h3>Daily Quota</h3>
+        <div class="value" id="quota">{{ stats.quota_remaining }} / {{ stats.daily_quota }}</div>
+    </div>
+</div>
 
-        <nav>
-            <a href="/queue">Queue</a>
-            <a href="/settings">Settings</a>
-        </nav>
-    </main>
-</body>
-</html>
+<!-- Recent Activity -->
+<div class="card">
+    <h2>Recent Activity (Last 5 Jobs)</h2>
+    <table id="recent-jobs">
+        <thead>
+            <tr>
+                <th>Job ID</th>
+                <th>Manga Title</th>
+                <th>Status</th>
+                <th>Created</th>
+                <th>YouTube Link</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td colspan="5" style="text-align: center; padding: 2rem;">Loading...</td>
+            </tr>
+        </tbody>
+    </table>
+</div>
+
+<p style="text-align: center; color: #666; margin-top: 1rem; font-size: 0.9rem;">
+    Auto-refreshing every 60 seconds
+</p>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    let refreshInterval;
+
+    // Load recent jobs
+    async function loadRecentJobs() {
+        try {
+            const response = await fetch('/api/queue?page=1&page_size=5', {
+                credentials: 'include'
+            });
+
+            if (!response.ok) {
+                throw new Error('Failed to load jobs');
+            }
+
+            const data = await response.json();
+            const tbody = document.querySelector('#recent-jobs tbody');
+
+            if (data.jobs.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; color: #666;">No jobs yet</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = data.jobs.map(job => `
+                <tr>
+                    <td><code>${truncateId(job.job_id)}</code></td>
+                    <td>${job.manga_title}</td>
+                    <td><span class="badge ${job.status}">${job.status}</span></td>
+                    <td>${formatDateTime(job.created_at)}</td>
+                    <td>
+                        ${job.youtube_url
+                            ? `<a href="${job.youtube_url}" target="_blank">View Video</a>`
+                            : '-'}
+                    </td>
+                </tr>
+            `).join('');
+        } catch (error) {
+            console.error('Error loading jobs:', error);
+        }
+    }
+
+    // Update stats
+    async function updateStats() {
+        try {
+            const response = await fetch('/api/stats', {
+                credentials: 'include'
+            });
+
+            if (!response.ok) {
+                throw new Error('Failed to load stats');
+            }
+
+            const stats = await response.json();
+
+            document.getElementById('videos-today').textContent = stats.videos_today;
+            document.getElementById('videos-total').textContent = stats.videos_total;
+            document.getElementById('videos-failed').textContent = stats.videos_failed;
+            document.getElementById('videos-pending').textContent = stats.videos_pending;
+
+            const avgTime = stats.avg_render_time_minutes
+                ? `${stats.avg_render_time_minutes.toFixed(1)} min`
+                : 'N/A';
+            document.getElementById('avg-render-time').textContent = avgTime;
+
+            document.getElementById('quota').textContent = `${stats.quota_remaining} / ${stats.daily_quota}`;
+        } catch (error) {
+            console.error('Error updating stats:', error);
+        }
+    }
+
+    // Refresh data
+    async function refreshData() {
+        await Promise.all([updateStats(), loadRecentJobs()]);
+    }
+
+    // Initialize
+    document.addEventListener('DOMContentLoaded', () => {
+        loadRecentJobs();
+
+        // Auto-refresh every 60 seconds
+        refreshInterval = setInterval(refreshData, 60000);
+    });
+
+    // Cleanup on page unload
+    window.addEventListener('beforeunload', () => {
+        if (refreshInterval) {
+            clearInterval(refreshInterval);
+        }
+    });
+</script>
+{% endblock %}

@@ -1,69 +1,208 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Settings - Manga Video Pipeline Admin</title>
-</head>
-<body>
-    <header>
-        <h1>Settings</h1>
-        <p>Welcome, {{ username }}!</p>
-        <nav>
-            <a href="/">Dashboard</a>
-            <a href="/queue">Queue</a>
-        </nav>
-    </header>
+{% extends "base.html" %}
 
-    <main>
-        <h2>Pipeline Settings</h2>
-        <form id="settingsForm">
-            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+{% block title %}Settings - Manga Video Pipeline{% endblock %}
 
-            <div>
-                <label for="daily_quota">Daily Video Quota:</label>
+{% block content %}
+<h1>Pipeline Settings</h1>
+
+<div class="card" style="max-width: 800px;">
+    <h2>Configuration</h2>
+
+    <form id="settingsForm">
+        <!-- Daily Quota -->
+        <div class="form-group">
+            <label for="daily_quota">
+                Daily Video Quota
+                <span style="color: #666; font-weight: normal;">(1-10 videos per day)</span>
+            </label>
+            <div style="display: flex; gap: 1rem; align-items: center;">
+                <input type="range" id="daily_quota_slider" min="1" max="10"
+                       value="{{ settings.daily_quota }}"
+                       style="flex: 1;"
+                       oninput="document.getElementById('daily_quota').value = this.value">
                 <input type="number" id="daily_quota" name="daily_quota"
-                       min="1" max="10" value="{{ settings.daily_quota }}" required>
+                       min="1" max="10" value="{{ settings.daily_quota }}"
+                       style="width: 80px;"
+                       oninput="document.getElementById('daily_quota_slider').value = this.value"
+                       required>
             </div>
+        </div>
 
-            <div>
-                <label for="voice_id">TTS Voice:</label>
-                <select id="voice_id" name="voice_id" required>
-                    {% for voice in voices %}
-                    <option value="{{ voice.id }}"
-                            {% if voice.id == settings.voice_id %}selected{% endif %}>
-                        {{ voice.name }}
-                    </option>
-                    {% endfor %}
-                </select>
-            </div>
+        <!-- Voice Selection -->
+        <div class="form-group">
+            <label for="voice_id">TTS Voice</label>
+            <select id="voice_id" name="voice_id" required>
+                {% for voice in voices %}
+                <option value="{{ voice.id }}"
+                        {% if voice.id == settings.voice_id %}selected{% endif %}>
+                    {{ voice.name }} ({{ voice.locale }})
+                </option>
+                {% endfor %}
+            </select>
+        </div>
 
-            <div>
-                <label for="tone">Narration Tone:</label>
-                <input type="text" id="tone" name="tone"
-                       value="{{ settings.tone }}" required>
-            </div>
+        <!-- Tone -->
+        <div class="form-group">
+            <label for="tone">Narration Tone</label>
+            <input type="text" id="tone" name="tone"
+                   value="{{ settings.tone }}"
+                   placeholder="e.g., engaging, professional, dramatic"
+                   required>
+            <small style="color: #666; display: block; margin-top: 0.5rem;">
+                Describe the desired tone for the narration (e.g., "engaging and enthusiastic")
+            </small>
+        </div>
 
-            <div>
-                <label for="script_style">Script Style:</label>
-                <select id="script_style" name="script_style" required>
-                    <option value="detailed_review"
-                            {% if settings.script_style == "detailed_review" %}selected{% endif %}>
-                        Detailed Review
-                    </option>
-                    <option value="summary"
-                            {% if settings.script_style == "summary" %}selected{% endif %}>
-                        Summary
-                    </option>
-                    <option value="chapter_walkthrough"
-                            {% if settings.script_style == "chapter_walkthrough" %}selected{% endif %}>
-                        Chapter Walkthrough
-                    </option>
-                </select>
-            </div>
+        <!-- Script Style -->
+        <div class="form-group">
+            <label for="script_style">Script Generation Style</label>
+            <select id="script_style" name="script_style" required>
+                <option value="detailed_review"
+                        {% if settings.script_style == 'detailed_review' %}selected{% endif %}>
+                    Detailed Review - Comprehensive analysis and commentary
+                </option>
+                <option value="summary"
+                        {% if settings.script_style == 'summary' %}selected{% endif %}>
+                    Summary - Brief overview of key events
+                </option>
+                <option value="chapter_walkthrough"
+                        {% if settings.script_style == 'chapter_walkthrough' %}selected{% endif %}>
+                    Chapter Walkthrough - Scene-by-scene narration
+                </option>
+            </select>
+        </div>
 
-            <button type="submit">Save Settings</button>
-        </form>
-    </main>
-</body>
-</html>
+        <button type="submit" style="width: 100%;">Save Settings</button>
+    </form>
+</div>
+
+<!-- Current Settings Info -->
+<div class="card" style="max-width: 800px; margin-top: 1.5rem;">
+    <h3>Current Configuration</h3>
+    <table style="background: transparent;">
+        <tr>
+            <td><strong>Daily Quota:</strong></td>
+            <td id="current-quota">{{ settings.daily_quota }} videos/day</td>
+        </tr>
+        <tr>
+            <td><strong>Voice:</strong></td>
+            <td id="current-voice">
+                {% for voice in voices %}
+                    {% if voice.id == settings.voice_id %}{{ voice.name }}{% endif %}
+                {% endfor %}
+            </td>
+        </tr>
+        <tr>
+            <td><strong>Tone:</strong></td>
+            <td id="current-tone">{{ settings.tone }}</td>
+        </tr>
+        <tr>
+            <td><strong>Script Style:</strong></td>
+            <td id="current-style">{{ settings.script_style }}</td>
+        </tr>
+    </table>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Load available voices
+    let availableVoices = [];
+
+    async function loadVoices() {
+        try {
+            const response = await fetch('/api/voices', {
+                credentials: 'include'
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                availableVoices = data.voices;
+            }
+        } catch (error) {
+            console.error('Error loading voices:', error);
+        }
+    }
+
+    // Get CSRF token
+    async function getCsrfToken() {
+        // CSRF token is embedded in the page by the server
+        // We need to fetch it from the settings page
+        try {
+            const response = await fetch('/settings', {
+                credentials: 'include'
+            });
+            const html = await response.text();
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(html, 'text/html');
+            const csrfInput = doc.querySelector('input[name="csrf_token"]');
+            return csrfInput ? csrfInput.value : null;
+        } catch (error) {
+            console.error('Error getting CSRF token:', error);
+            return null;
+        }
+    }
+
+    // Save settings
+    async function saveSettings(event) {
+        event.preventDefault();
+
+        const submitButton = event.target.querySelector('button[type="submit"]');
+        submitButton.disabled = true;
+        submitButton.textContent = 'Saving...';
+
+        try {
+            // Get CSRF token from cookie or generate new one
+            const csrfToken = '{{ csrf_token }}';
+
+            const formData = {
+                daily_quota: parseInt(document.getElementById('daily_quota').value),
+                voice_id: document.getElementById('voice_id').value,
+                tone: document.getElementById('tone').value,
+                script_style: document.getElementById('script_style').value,
+                csrf_token: csrfToken
+            };
+
+            const response = await fetch('/api/settings', {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(formData),
+                credentials: 'include'
+            });
+
+            const data = await response.json();
+
+            if (response.ok) {
+                showToast('Settings saved successfully', 'success');
+
+                // Update current settings display
+                document.getElementById('current-quota').textContent = `${formData.daily_quota} videos/day`;
+
+                const selectedVoice = availableVoices.find(v => v.id === formData.voice_id);
+                if (selectedVoice) {
+                    document.getElementById('current-voice').textContent = selectedVoice.name;
+                }
+
+                document.getElementById('current-tone').textContent = formData.tone;
+                document.getElementById('current-style').textContent = formData.script_style;
+            } else {
+                showToast(data.detail || 'Failed to save settings', 'error');
+            }
+        } catch (error) {
+            console.error('Error saving settings:', error);
+            showToast('Network error. Please try again.', 'error');
+        } finally {
+            submitButton.disabled = false;
+            submitButton.textContent = 'Save Settings';
+        }
+    }
+
+    // Initialize
+    document.addEventListener('DOMContentLoaded', () => {
+        loadVoices();
+        document.getElementById('settingsForm').addEventListener('submit', saveSettings);
+    });
+</script>
+{% endblock %}

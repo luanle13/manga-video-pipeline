@@ -1,65 +1,216 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Job Queue - Manga Video Pipeline Admin</title>
-</head>
-<body>
-    <header>
-        <h1>Job Queue</h1>
-        <p>Welcome, {{ username }}!</p>
-        <nav>
-            <a href="/">Dashboard</a>
-            <a href="/settings">Settings</a>
-        </nav>
-    </header>
+{% extends "base.html" %}
 
-    <main>
-        <h2>Video Jobs</h2>
+{% block title %}Queue - Manga Video Pipeline{% endblock %}
 
-        <div class="filters">
-            <form method="GET" action="/queue">
-                <label for="status">Filter by status:</label>
-                <select id="status" name="status">
-                    <option value="">All</option>
-                    <option value="pending">Pending</option>
-                    <option value="fetching">Fetching</option>
-                    <option value="scripting">Scripting</option>
-                    <option value="tts">TTS</option>
-                    <option value="rendering">Rendering</option>
-                    <option value="uploading">Uploading</option>
-                    <option value="completed">Completed</option>
-                    <option value="failed">Failed</option>
-                </select>
-                <button type="submit">Filter</button>
-            </form>
+{% block content %}
+<h1>Video Job Queue</h1>
+
+<!-- Filter and Controls -->
+<div class="card">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+        <div style="display: flex; gap: 1rem; align-items: center;">
+            <label for="statusFilter" style="margin: 0;">Filter by Status:</label>
+            <select id="statusFilter" style="width: 200px;">
+                <option value="">All</option>
+                <option value="pending">Pending</option>
+                <option value="fetching">Fetching</option>
+                <option value="scripting">Scripting</option>
+                <option value="tts">TTS</option>
+                <option value="rendering">Rendering</option>
+                <option value="uploading">Uploading</option>
+                <option value="completed">Completed</option>
+                <option value="failed">Failed</option>
+            </select>
         </div>
+        <div style="color: #666; font-size: 0.9rem;">
+            Auto-refreshing every 30 seconds
+        </div>
+    </div>
 
-        <table>
-            <thead>
+    <!-- Jobs Table -->
+    <table id="jobs-table">
+        <thead>
+            <tr>
+                <th>Job ID</th>
+                <th>Manga Title</th>
+                <th>Status</th>
+                <th>Created</th>
+                <th>Updated</th>
+                <th>YouTube Link</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td colspan="7" style="text-align: center; padding: 2rem;">Loading...</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <!-- Pagination -->
+    <div class="pagination">
+        <button id="prevPage" onclick="previousPage()" disabled>← Previous</button>
+        <span id="pageInfo" style="padding: 0.5rem 1rem;">Page 1</span>
+        <button id="nextPage" onclick="nextPage()" disabled>Next →</button>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    let currentPage = 1;
+    let currentFilter = '';
+    let totalPages = 1;
+    let refreshInterval;
+
+    // Load jobs
+    async function loadJobs() {
+        try {
+            const params = new URLSearchParams({
+                page: currentPage,
+                page_size: 20
+            });
+
+            if (currentFilter) {
+                params.append('status_filter', currentFilter);
+            }
+
+            const response = await fetch(`/api/queue?${params}`, {
+                credentials: 'include'
+            });
+
+            if (!response.ok) {
+                throw new Error('Failed to load jobs');
+            }
+
+            const data = await response.json();
+            const tbody = document.querySelector('#jobs-table tbody');
+
+            if (data.jobs.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; color: #666;">No jobs found</td></tr>';
+                updatePaginationControls(0);
+                return;
+            }
+
+            tbody.innerHTML = data.jobs.map(job => `
                 <tr>
-                    <th>Job ID</th>
-                    <th>Manga ID</th>
-                    <th>Chapter</th>
-                    <th>Status</th>
-                    <th>Created</th>
-                    <th>Updated</th>
-                    <th>Actions</th>
+                    <td><code>${truncateId(job.job_id)}</code></td>
+                    <td>${job.manga_title}</td>
+                    <td><span class="badge ${job.status}">${job.status}</span></td>
+                    <td>${formatDateTime(job.created_at)}</td>
+                    <td>${formatDateTime(job.updated_at)}</td>
+                    <td>
+                        ${job.youtube_url
+                            ? `<a href="${job.youtube_url}" target="_blank">Watch</a>`
+                            : '-'}
+                    </td>
+                    <td>
+                        ${job.status === 'failed'
+                            ? `<button class="btn btn-sm" onclick="retryJob('${job.job_id}')">Retry</button>`
+                            : '-'}
+                    </td>
                 </tr>
-            </thead>
-            <tbody id="jobsTableBody">
-                <!-- Jobs will be loaded via JavaScript/API -->
-            </tbody>
-        </table>
+            `).join('');
 
-        <div class="pagination">
-            <!-- Pagination controls -->
-        </div>
-    </main>
+            updatePaginationControls(data.total);
+        } catch (error) {
+            console.error('Error loading jobs:', error);
+            showToast('Failed to load jobs', 'error');
+        }
+    }
 
-    <script>
-        // JavaScript for loading and displaying jobs would go here
-    </script>
-</body>
-</html>
+    // Update pagination controls
+    function updatePaginationControls(total) {
+        const pageSize = 20;
+        totalPages = Math.ceil(total / pageSize);
+
+        document.getElementById('prevPage').disabled = currentPage === 1;
+        document.getElementById('nextPage').disabled = currentPage >= totalPages || totalPages === 0;
+        document.getElementById('pageInfo').textContent = totalPages > 0
+            ? `Page ${currentPage} of ${totalPages}`
+            : 'No results';
+    }
+
+    // Pagination functions
+    function previousPage() {
+        if (currentPage > 1) {
+            currentPage--;
+            loadJobs();
+        }
+    }
+
+    function nextPage() {
+        if (currentPage < totalPages) {
+            currentPage++;
+            loadJobs();
+        }
+    }
+
+    // Retry job
+    async function retryJob(jobId) {
+        if (!confirm('Are you sure you want to retry this job?')) {
+            return;
+        }
+
+        try {
+            // Get CSRF token
+            const csrfResponse = await fetch('/settings', {
+                credentials: 'include'
+            });
+            const csrfHtml = await csrfResponse.text();
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(csrfHtml, 'text/html');
+            const csrfToken = doc.querySelector('input[name="csrf_token"]')?.value;
+
+            if (!csrfToken) {
+                throw new Error('Failed to get CSRF token');
+            }
+
+            // Retry job
+            const formData = new FormData();
+            formData.append('csrf_token', csrfToken);
+
+            const response = await fetch(`/api/queue/${jobId}/retry`, {
+                method: 'POST',
+                body: formData,
+                credentials: 'include'
+            });
+
+            const data = await response.json();
+
+            if (response.ok) {
+                showToast('Job retry initiated successfully', 'success');
+                loadJobs(); // Reload jobs
+            } else {
+                showToast(data.detail || 'Failed to retry job', 'error');
+            }
+        } catch (error) {
+            console.error('Error retrying job:', error);
+            showToast('Failed to retry job', 'error');
+        }
+    }
+
+    // Initialize
+    document.addEventListener('DOMContentLoaded', () => {
+        // Load initial jobs
+        loadJobs();
+
+        // Status filter listener
+        document.getElementById('statusFilter').addEventListener('change', (e) => {
+            currentFilter = e.target.value;
+            currentPage = 1; // Reset to first page
+            loadJobs();
+        });
+
+        // Auto-refresh every 30 seconds
+        refreshInterval = setInterval(loadJobs, 30000);
+    });
+
+    // Cleanup on page unload
+    window.addEventListener('beforeunload', () => {
+        if (refreshInterval) {
+            clearInterval(refreshInterval);
+        }
+    });
+</script>
+{% endblock %}
