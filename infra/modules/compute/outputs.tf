@@ -255,6 +255,39 @@ output "dashboard_log_group_name" {
 # Combined Summary
 # =============================================================================
 
+# =============================================================================
+# Step Functions Outputs
+# =============================================================================
+
+output "state_machine_arn" {
+  description = "ARN of the Step Functions state machine"
+  value       = aws_sfn_state_machine.pipeline.arn
+}
+
+output "state_machine_name" {
+  description = "Name of the Step Functions state machine"
+  value       = aws_sfn_state_machine.pipeline.name
+}
+
+output "state_machine_id" {
+  description = "ID of the Step Functions state machine"
+  value       = aws_sfn_state_machine.pipeline.id
+}
+
+output "step_functions_log_group_name" {
+  description = "Name of the Step Functions CloudWatch log group"
+  value       = aws_cloudwatch_log_group.step_functions.name
+}
+
+output "step_functions_log_group_arn" {
+  description = "ARN of the Step Functions CloudWatch log group"
+  value       = aws_cloudwatch_log_group.step_functions.arn
+}
+
+# =============================================================================
+# Combined Summary
+# =============================================================================
+
 output "compute_summary" {
   description = "Summary of compute resources created"
   value = {
@@ -312,6 +345,12 @@ output "compute_summary" {
       public_ip      = var.dashboard_enable_elastic_ip ? aws_eip.dashboard[0].public_ip : aws_instance.dashboard.public_ip
       elastic_ip     = var.dashboard_enable_elastic_ip
       root_volume_gb = 20
+    }
+    step_functions = {
+      state_machine_arn  = aws_sfn_state_machine.pipeline.arn
+      state_machine_name = aws_sfn_state_machine.pipeline.name
+      xray_enabled       = var.enable_xray_tracing
+      log_group          = aws_cloudwatch_log_group.step_functions.name
     }
     log_retention_days = var.log_retention_days
   }

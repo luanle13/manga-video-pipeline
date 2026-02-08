@@ -148,9 +148,9 @@ module "compute" {
   dashboard_enable_elastic_ip = var.dashboard_enable_elastic_ip
   dashboard_domain            = var.dashboard_domain
 
-  # Step Functions integration (will be updated when state machine is created)
-  state_machine_arn     = ""
-  cleanup_function_name = "${var.project_name}-cleanup"
+  # Step Functions integration
+  step_functions_role_arn = module.security.step_functions_role_arn
+  enable_xray_tracing     = var.enable_xray_tracing
 
   # CloudWatch Logs configuration
   log_retention_days = var.log_retention_days
@@ -164,10 +164,29 @@ module "compute" {
 }
 
 # =============================================================================
-# Additional modules will be added here:
-# - Step Functions state machine
-# - EventBridge rules
-# - Secrets Manager secrets
+# Scheduling Module - EventBridge Rules
+# =============================================================================
+
+module "scheduling" {
+  source = "./modules/scheduling"
+
+  # Step Functions state machine to trigger
+  state_machine_arn = module.compute.state_machine_arn
+
+  # Environment configuration
+  environment = var.environment
+
+  # Schedule configuration (default: midnight Vietnam time)
+  schedule_expression = var.pipeline_schedule_expression
+  enabled             = var.pipeline_schedule_enabled
+
+  # Additional tags
+  tags = var.additional_tags
+}
+
+# =============================================================================
+# Additional modules can be added here:
+# - Secrets Manager secrets (if not created manually)
 # - CloudWatch alarms
 # - SNS topics for notifications
 # =============================================================================

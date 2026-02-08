@@ -290,6 +290,17 @@ variable "jwt_secret_name" {
 # Step Functions Integration
 # =============================================================================
 
+variable "step_functions_role_arn" {
+  description = "ARN of the Step Functions execution role (from security module)"
+  type        = string
+}
+
+variable "enable_xray_tracing" {
+  description = "Enable X-Ray tracing for Step Functions"
+  type        = bool
+  default     = false
+}
+
 variable "state_machine_arn" {
   description = "ARN of the Step Functions state machine (for dashboard)"
   type        = string

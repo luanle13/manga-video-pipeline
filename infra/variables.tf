@@ -332,6 +332,33 @@ variable "enable_daily_trigger" {
   default     = true
 }
 
+variable "pipeline_schedule_expression" {
+  description = "Cron expression for the EventBridge rule (default: midnight Vietnam time)"
+  type        = string
+  default     = "cron(0 17 * * ? *)" # 17:00 UTC = 00:00 UTC+7 (Vietnam)
+
+  validation {
+    condition     = can(regex("^(rate|cron)\\(.+\\)$", var.pipeline_schedule_expression))
+    error_message = "Schedule expression must be a valid EventBridge rate or cron expression."
+  }
+}
+
+variable "pipeline_schedule_enabled" {
+  description = "Enable/disable the EventBridge scheduled trigger"
+  type        = bool
+  default     = true
+}
+
+# =============================================================================
+# Step Functions Variables
+# =============================================================================
+
+variable "enable_xray_tracing" {
+  description = "Enable X-Ray tracing for Step Functions (useful for debugging)"
+  type        = bool
+  default     = false
+}
+
 # =============================================================================
 # API & External Service Variables
 # =============================================================================

@@ -162,7 +162,67 @@ output "dashboard_nip_io_url" {
 }
 
 # =============================================================================
-# Future Infrastructure Outputs (to be implemented)
+# Step Functions Outputs
 # =============================================================================
-# Step Functions, EventBridge, Secrets Manager, CloudWatch alarms,
-# Budget, etc. will be added as additional modules are created
+
+output "state_machine_arn" {
+  description = "ARN of the Step Functions state machine"
+  value       = module.compute.state_machine_arn
+}
+
+output "state_machine_name" {
+  description = "Name of the Step Functions state machine"
+  value       = module.compute.state_machine_name
+}
+
+output "step_functions_log_group_name" {
+  description = "Name of the Step Functions CloudWatch log group"
+  value       = module.compute.step_functions_log_group_name
+}
+
+# =============================================================================
+# EventBridge Scheduling Outputs
+# =============================================================================
+
+output "eventbridge_rule_name" {
+  description = "Name of the EventBridge daily trigger rule"
+  value       = module.scheduling.eventbridge_rule_name
+}
+
+output "eventbridge_rule_arn" {
+  description = "ARN of the EventBridge daily trigger rule"
+  value       = module.scheduling.eventbridge_rule_arn
+}
+
+output "schedule_expression" {
+  description = "Cron expression for the pipeline schedule"
+  value       = module.scheduling.schedule_expression
+}
+
+output "schedule_enabled" {
+  description = "Whether the EventBridge schedule is enabled"
+  value       = module.scheduling.enabled
+}
+
+# =============================================================================
+# Pipeline Summary
+# =============================================================================
+
+output "pipeline_summary" {
+  description = "Summary of the complete manga video pipeline"
+  value = {
+    state_machine = {
+      name = module.compute.state_machine_name
+      arn  = module.compute.state_machine_arn
+    }
+    schedule = {
+      rule_name  = module.scheduling.eventbridge_rule_name
+      expression = module.scheduling.schedule_expression
+      enabled    = module.scheduling.enabled
+    }
+    dashboard = {
+      url        = module.compute.dashboard_url
+      nip_io_url = module.compute.dashboard_nip_io_url
+    }
+  }
+}
