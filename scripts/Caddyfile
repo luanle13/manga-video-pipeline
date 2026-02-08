@@ -1,0 +1,56 @@
+# Caddy configuration for Manga Video Pipeline Admin Dashboard
+# Automatically provisions TLS certificate using Let's Encrypt
+# Uses nip.io for dynamic DNS based on EC2 public IP
+
+# This placeholder will be replaced by the actual IP in the user-data script
+{$DASHBOARD_DOMAIN:localhost} {
+    # Reverse proxy to Uvicorn
+    reverse_proxy localhost:8000
+
+    # Security headers
+    header {
+        # Enable HSTS (HTTP Strict Transport Security)
+        Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+
+        # Prevent clickjacking
+        X-Frame-Options "DENY"
+
+        # Prevent MIME type sniffing
+        X-Content-Type-Options "nosniff"
+
+        # Enable XSS protection
+        X-XSS-Protection "1; mode=block"
+
+        # Referrer policy
+        Referrer-Policy "strict-origin-when-cross-origin"
+
+        # Content Security Policy
+        Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self'; connect-src 'self'; frame-ancestors 'none';"
+
+        # Remove server header
+        -Server
+    }
+
+    # Logging
+    log {
+        output file /var/log/caddy/dashboard.log
+        format json
+        level INFO
+    }
+
+    # Error handling
+    handle_errors {
+        @502 expression {http.error.status_code} == 502
+        @503 expression {http.error.status_code} == 503
+
+        handle @502 {
+            respond "Dashboard service temporarily unavailable" 502
+        }
+
+        handle @503 {
+            respond "Dashboard service unavailable" 503
+        }
+    }
+}
+
+# HTTP -> HTTPS redirect is automatic with Caddy
