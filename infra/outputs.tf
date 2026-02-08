@@ -85,7 +85,36 @@ output "security_summary" {
 }
 
 # =============================================================================
+# Lambda Function Outputs
+# =============================================================================
+
+output "lambda_function_arns" {
+  description = "Map of Lambda function ARNs"
+  value       = module.compute.lambda_function_arns
+}
+
+output "lambda_function_names" {
+  description = "Map of Lambda function names"
+  value       = module.compute.lambda_function_names
+}
+
+output "lambda_invoke_arns" {
+  description = "Map of Lambda invoke ARNs (for Step Functions)"
+  value       = module.compute.lambda_invoke_arns
+}
+
+output "log_group_names" {
+  description = "Map of CloudWatch log group names"
+  value       = module.compute.log_group_names
+}
+
+output "compute_summary" {
+  description = "Summary of compute resources created"
+  value       = module.compute.compute_summary
+}
+
+# =============================================================================
 # Future Infrastructure Outputs (to be implemented)
 # =============================================================================
-# Lambda functions, Step Functions, EC2, EventBridge, Secrets Manager,
-# CloudWatch, VPC, Budget, etc. will be added as additional modules are created
+# Step Functions, EC2, EventBridge, Secrets Manager, CloudWatch alarms,
+# VPC, Budget, etc. will be added as additional modules are created

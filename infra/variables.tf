@@ -185,11 +185,62 @@ variable "lambda_reserved_concurrency" {
     manga_fetcher    = number
     script_generator = number
     tts_processor    = number
+    quota_checker    = number
+    cleanup          = number
   })
   default = {
     manga_fetcher    = -1
     script_generator = 5 # Limit to 5 concurrent LLM calls
     tts_processor    = -1
+    quota_checker    = -1
+    cleanup          = -1
+  }
+}
+
+# =============================================================================
+# Lambda Deployment Variables
+# =============================================================================
+
+variable "lambda_deployment_bucket" {
+  description = "S3 bucket containing Lambda deployment packages"
+  type        = string
+}
+
+variable "lambda_deployment_prefix" {
+  description = "S3 key prefix for Lambda deployment packages"
+  type        = string
+  default     = "lambda-packages"
+}
+
+variable "lambda_package_version" {
+  description = "Version/hash of the Lambda deployment package (for CI/CD)"
+  type        = string
+  default     = "latest"
+}
+
+# =============================================================================
+# CloudWatch Logs Variables
+# =============================================================================
+
+variable "log_retention_days" {
+  description = "CloudWatch Logs retention period in days"
+  type        = number
+  default     = 30
+
+  validation {
+    condition     = contains([1, 3, 5, 7, 14, 30, 60, 90, 120, 150, 180, 365, 400, 545, 731, 1096, 1827, 2192, 2557, 2922, 3288, 3653], var.log_retention_days)
+    error_message = "Log retention must be a valid CloudWatch Logs retention value."
+  }
+}
+
+variable "log_level" {
+  description = "Application log level for Lambda functions"
+  type        = string
+  default     = "INFO"
+
+  validation {
+    condition     = contains(["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"], var.log_level)
+    error_message = "Log level must be DEBUG, INFO, WARNING, ERROR, or CRITICAL."
   }
 }
 
