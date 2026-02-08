@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Job Queue - Manga Video Pipeline Admin</title>
+</head>
+<body>
+    <header>
+        <h1>Job Queue</h1>
+        <p>Welcome, {{ username }}!</p>
+        <nav>
+            <a href="/">Dashboard</a>
+            <a href="/settings">Settings</a>
+        </nav>
+    </header>
+
+    <main>
+        <h2>Video Jobs</h2>
+
+        <div class="filters">
+            <form method="GET" action="/queue">
+                <label for="status">Filter by status:</label>
+                <select id="status" name="status">
+                    <option value="">All</option>
+                    <option value="pending">Pending</option>
+                    <option value="fetching">Fetching</option>
+                    <option value="scripting">Scripting</option>
+                    <option value="tts">TTS</option>
+                    <option value="rendering">Rendering</option>
+                    <option value="uploading">Uploading</option>
+                    <option value="completed">Completed</option>
+                    <option value="failed">Failed</option>
+                </select>
+                <button type="submit">Filter</button>
+            </form>
+        </div>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Job ID</th>
+                    <th>Manga ID</th>
+                    <th>Chapter</th>
+                    <th>Status</th>
+                    <th>Created</th>
+                    <th>Updated</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody id="jobsTableBody">
+                <!-- Jobs will be loaded via JavaScript/API -->
+            </tbody>
+        </table>
+
+        <div class="pagination">
+            <!-- Pagination controls -->
+        </div>
+    </main>
+
+    <script>
+        // JavaScript for loading and displaying jobs would go here
+    </script>
+</body>
+</html>

@@ -218,6 +218,49 @@ class S3Client:
         )
         return deleted_count
 
+    def delete_prefix_with_metrics(self, prefix: str) -> tuple[int, int]:
+        """
+        Delete all objects under a prefix and return metrics.
+
+        Args:
+            prefix: S3 key prefix to delete.
+
+        Returns:
+            Tuple of (objects_deleted, bytes_freed).
+        """
+        deleted_count = 0
+        bytes_freed = 0
+        paginator = self._client.get_paginator("list_objects_v2")
+
+        for page in paginator.paginate(Bucket=self._bucket, Prefix=prefix):
+            contents = page.get("Contents", [])
+            if not contents:
+                continue
+
+            # Track sizes before deletion
+            for obj in contents:
+                bytes_freed += obj.get("Size", 0)
+
+            # Delete in batches of up to 1000 (S3 limit)
+            objects_to_delete = [{"Key": obj["Key"]} for obj in contents]
+
+            self._client.delete_objects(
+                Bucket=self._bucket,
+                Delete={"Objects": objects_to_delete},
+            )
+            deleted_count += len(objects_to_delete)
+
+        logger.info(
+            "Objects deleted from S3 with metrics",
+            extra={
+                "prefix": prefix,
+                "deleted_count": deleted_count,
+                "bytes_freed": bytes_freed,
+                "operation": "delete_prefix_with_metrics",
+            },
+        )
+        return deleted_count, bytes_freed
+
     def list_objects(self, prefix: str) -> list[str]:
         """
         List all object keys under a prefix.

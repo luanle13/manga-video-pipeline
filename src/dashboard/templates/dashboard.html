@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - Manga Video Pipeline Admin</title>
+</head>
+<body>
+    <header>
+        <h1>Manga Video Pipeline Admin</h1>
+        <p>Welcome, {{ username }}!</p>
+        <form method="POST" action="/api/auth/logout">
+            <button type="submit">Logout</button>
+        </form>
+    </header>
+
+    <main>
+        <h2>Statistics</h2>
+        <div class="stats">
+            <div class="stat">
+                <h3>Videos Today</h3>
+                <p>{{ stats.videos_today }}</p>
+            </div>
+            <div class="stat">
+                <h3>Total Videos</h3>
+                <p>{{ stats.videos_total }}</p>
+            </div>
+            <div class="stat">
+                <h3>Failed Videos</h3>
+                <p>{{ stats.videos_failed }}</p>
+            </div>
+            <div class="stat">
+                <h3>Pending Videos</h3>
+                <p>{{ stats.videos_pending }}</p>
+            </div>
+            <div class="stat">
+                <h3>Avg Render Time</h3>
+                <p>{{ "%.1f"|format(stats.avg_render_time_minutes) if stats.avg_render_time_minutes else "N/A" }} min</p>
+            </div>
+            <div class="stat">
+                <h3>Daily Quota</h3>
+                <p>{{ stats.quota_remaining }} / {{ stats.daily_quota }}</p>
+            </div>
+        </div>
+
+        <nav>
+            <a href="/queue">Queue</a>
+            <a href="/settings">Settings</a>
+        </nav>
+    </main>
+</body>
+</html>

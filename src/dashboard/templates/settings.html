@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Settings - Manga Video Pipeline Admin</title>
+</head>
+<body>
+    <header>
+        <h1>Settings</h1>
+        <p>Welcome, {{ username }}!</p>
+        <nav>
+            <a href="/">Dashboard</a>
+            <a href="/queue">Queue</a>
+        </nav>
+    </header>
+
+    <main>
+        <h2>Pipeline Settings</h2>
+        <form id="settingsForm">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+
+            <div>
+                <label for="daily_quota">Daily Video Quota:</label>
+                <input type="number" id="daily_quota" name="daily_quota"
+                       min="1" max="10" value="{{ settings.daily_quota }}" required>
+            </div>
+
+            <div>
+                <label for="voice_id">TTS Voice:</label>
+                <select id="voice_id" name="voice_id" required>
+                    {% for voice in voices %}
+                    <option value="{{ voice.id }}"
+                            {% if voice.id == settings.voice_id %}selected{% endif %}>
+                        {{ voice.name }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div>
+                <label for="tone">Narration Tone:</label>
+                <input type="text" id="tone" name="tone"
+                       value="{{ settings.tone }}" required>
+            </div>
+
+            <div>
+                <label for="script_style">Script Style:</label>
+                <select id="script_style" name="script_style" required>
+                    <option value="detailed_review"
+                            {% if settings.script_style == "detailed_review" %}selected{% endif %}>
+                        Detailed Review
+                    </option>
+                    <option value="summary"
+                            {% if settings.script_style == "summary" %}selected{% endif %}>
+                        Summary
+                    </option>
+                    <option value="chapter_walkthrough"
+                            {% if settings.script_style == "chapter_walkthrough" %}selected{% endif %}>
+                        Chapter Walkthrough
+                    </option>
+                </select>
+            </div>
+
+            <button type="submit">Save Settings</button>
+        </form>
+    </main>
+</body>
+</html>

@@ -21,6 +21,7 @@ class Settings(BaseSettings):
     default_voice_id: str = "vi-VN-HoaiMyNeural"
     default_tone: str = "engaging and informative"
     default_daily_quota: int = 1
+    daily_quota: int = 10
 
     model_config = {"env_prefix": "", "case_sensitive": False}
 
