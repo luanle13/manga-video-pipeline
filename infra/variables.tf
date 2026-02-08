@@ -293,6 +293,24 @@ variable "dashboard_enable_public_ip" {
   default     = true
 }
 
+variable "dashboard_enable_elastic_ip" {
+  description = "Allocate Elastic IP for dashboard (stable IP for nip.io)"
+  type        = bool
+  default     = false
+}
+
+variable "dashboard_domain" {
+  description = "Optional domain name for dashboard SSL certificate"
+  type        = string
+  default     = ""
+}
+
+variable "enable_ssh_access" {
+  description = "Enable SSH access to dashboard instance (for debugging only)"
+  type        = bool
+  default     = false
+}
+
 # =============================================================================
 # EventBridge Scheduler Variables
 # =============================================================================

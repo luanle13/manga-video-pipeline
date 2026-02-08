@@ -70,7 +70,29 @@ module "security" {
 }
 
 # =============================================================================
-# Compute Module - Lambda Functions
+# Networking Module - VPC and Security Groups
+# =============================================================================
+
+module "networking" {
+  source = "./modules/networking"
+
+  project_name = var.project_name
+  environment  = var.environment
+
+  # Security configuration
+  admin_ip          = var.admin_ip
+  allowed_ip_ranges = var.allowed_ip_ranges
+
+  # Feature flags
+  enable_ssh_access    = var.enable_ssh_access
+  enable_http_redirect = true
+
+  # Additional tags
+  tags = var.additional_tags
+}
+
+# =============================================================================
+# Compute Module - Lambda Functions and EC2 Instances
 # =============================================================================
 
 module "compute" {
@@ -82,6 +104,9 @@ module "compute" {
   # IAM role ARNs (from security module)
   lambda_role_arns = module.security.lambda_role_arns
 
+  # EC2 instance profiles (from security module)
+  ec2_instance_profile_names = module.security.ec2_instance_profile_names
+
   # Storage resources (from storage module)
   s3_assets_bucket_name               = module.storage.s3_assets_bucket_id
   s3_assets_bucket_arn                = module.storage.s3_assets_bucket_arn
@@ -89,9 +114,18 @@ module "compute" {
   dynamodb_processed_manga_table_name = module.storage.dynamodb_processed_manga_table_name
   dynamodb_settings_table_name        = module.storage.dynamodb_settings_table_name
 
+  # Networking resources (from networking module)
+  renderer_security_group_id  = module.networking.renderer_security_group_id
+  dashboard_security_group_id = module.networking.dashboard_security_group_id
+  dashboard_subnet_id         = module.networking.primary_subnet_id
+  renderer_subnet_ids         = module.networking.selected_subnet_ids
+
   # Secrets Manager secret names
-  deepinfra_api_key_secret_name = var.deepinfra_api_key_secret_name
-  mangadex_secret_name          = var.mangadex_secret_name
+  deepinfra_api_key_secret_name   = var.deepinfra_api_key_secret_name
+  mangadex_secret_name            = var.mangadex_secret_name
+  youtube_credentials_secret_name = var.youtube_credentials_secret_name
+  admin_credentials_secret_name   = var.admin_credentials_secret_name
+  jwt_secret_name                 = var.jwt_secret_name
 
   # Lambda deployment configuration
   lambda_deployment_bucket = var.lambda_deployment_bucket
@@ -101,6 +135,22 @@ module "compute" {
   # Lambda runtime configuration
   lambda_runtime      = var.lambda_runtime
   lambda_architecture = "arm64" # Cost savings (~20% cheaper)
+
+  # EC2 Spot renderer configuration
+  spot_instance_type         = var.spot_instance_type
+  spot_max_price             = var.spot_max_price
+  spot_interruption_behavior = var.spot_interruption_behavior
+  enable_detailed_monitoring = var.enable_detailed_monitoring
+
+  # EC2 dashboard configuration
+  dashboard_instance_type     = var.dashboard_instance_type
+  dashboard_enable_public_ip  = var.dashboard_enable_public_ip
+  dashboard_enable_elastic_ip = var.dashboard_enable_elastic_ip
+  dashboard_domain            = var.dashboard_domain
+
+  # Step Functions integration (will be updated when state machine is created)
+  state_machine_arn     = ""
+  cleanup_function_name = "${var.project_name}-cleanup"
 
   # CloudWatch Logs configuration
   log_retention_days = var.log_retention_days
@@ -116,7 +166,6 @@ module "compute" {
 # =============================================================================
 # Additional modules will be added here:
 # - Step Functions state machine
-# - EC2 launch templates (spot renderer, dashboard)
 # - EventBridge rules
 # - Secrets Manager secrets
 # - CloudWatch alarms

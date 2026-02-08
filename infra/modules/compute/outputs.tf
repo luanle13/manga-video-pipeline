@@ -173,6 +173,88 @@ output "log_group_names" {
   }
 }
 
+# =============================================================================
+# EC2 Spot Renderer Outputs
+# =============================================================================
+
+output "renderer_launch_template_id" {
+  description = "ID of the renderer launch template"
+  value       = aws_launch_template.renderer.id
+}
+
+output "renderer_launch_template_arn" {
+  description = "ARN of the renderer launch template"
+  value       = aws_launch_template.renderer.arn
+}
+
+output "renderer_launch_template_latest_version" {
+  description = "Latest version of the renderer launch template"
+  value       = aws_launch_template.renderer.latest_version
+}
+
+output "renderer_log_group_name" {
+  description = "Name of the renderer CloudWatch log group"
+  value       = aws_cloudwatch_log_group.renderer.name
+}
+
+output "renderer_job_id_parameter_name" {
+  description = "SSM parameter name for renderer job ID"
+  value       = aws_ssm_parameter.renderer_job_id.name
+}
+
+output "renderer_task_token_parameter_name" {
+  description = "SSM parameter name for renderer task token"
+  value       = aws_ssm_parameter.renderer_task_token.name
+}
+
+# =============================================================================
+# EC2 Dashboard Outputs
+# =============================================================================
+
+output "dashboard_instance_id" {
+  description = "ID of the dashboard EC2 instance"
+  value       = aws_instance.dashboard.id
+}
+
+output "dashboard_private_ip" {
+  description = "Private IP address of the dashboard instance"
+  value       = aws_instance.dashboard.private_ip
+}
+
+output "dashboard_public_ip" {
+  description = "Public IP address of the dashboard instance"
+  value       = var.dashboard_enable_elastic_ip ? aws_eip.dashboard[0].public_ip : aws_instance.dashboard.public_ip
+}
+
+output "dashboard_public_dns" {
+  description = "Public DNS name of the dashboard instance"
+  value       = aws_instance.dashboard.public_dns
+}
+
+output "dashboard_elastic_ip" {
+  description = "Elastic IP address (if enabled)"
+  value       = var.dashboard_enable_elastic_ip ? aws_eip.dashboard[0].public_ip : null
+}
+
+output "dashboard_url" {
+  description = "HTTPS URL to access the dashboard"
+  value       = "https://${var.dashboard_enable_elastic_ip ? aws_eip.dashboard[0].public_ip : aws_instance.dashboard.public_ip}"
+}
+
+output "dashboard_nip_io_url" {
+  description = "nip.io URL for the dashboard (no DNS required)"
+  value       = "https://${var.dashboard_enable_elastic_ip ? aws_eip.dashboard[0].public_ip : aws_instance.dashboard.public_ip}.nip.io"
+}
+
+output "dashboard_log_group_name" {
+  description = "Name of the dashboard CloudWatch log group"
+  value       = aws_cloudwatch_log_group.dashboard.name
+}
+
+# =============================================================================
+# Combined Summary
+# =============================================================================
+
 output "compute_summary" {
   description = "Summary of compute resources created"
   value = {
@@ -217,6 +299,19 @@ output "compute_summary" {
         runtime     = aws_lambda_function.quota_checker.runtime
         arch        = aws_lambda_function.quota_checker.architectures[0]
       }
+    }
+    ec2_renderer = {
+      launch_template_id = aws_launch_template.renderer.id
+      instance_type      = var.spot_instance_type
+      spot_pricing       = var.spot_max_price != "" ? var.spot_max_price : "on-demand"
+      root_volume_gb     = 50
+    }
+    ec2_dashboard = {
+      instance_id    = aws_instance.dashboard.id
+      instance_type  = var.dashboard_instance_type
+      public_ip      = var.dashboard_enable_elastic_ip ? aws_eip.dashboard[0].public_ip : aws_instance.dashboard.public_ip
+      elastic_ip     = var.dashboard_enable_elastic_ip
+      root_volume_gb = 20
     }
     log_retention_days = var.log_retention_days
   }

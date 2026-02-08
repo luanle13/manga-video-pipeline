@@ -168,6 +168,141 @@ variable "reserved_concurrency" {
 }
 
 # =============================================================================
+# EC2 Instance Profiles (from security module)
+# =============================================================================
+
+variable "ec2_instance_profile_names" {
+  description = "Map of EC2 instance profile names from security module"
+  type = object({
+    renderer  = string
+    dashboard = string
+  })
+}
+
+# =============================================================================
+# Networking Resources (from networking module)
+# =============================================================================
+
+variable "renderer_security_group_id" {
+  description = "Security group ID for renderer instances"
+  type        = string
+}
+
+variable "dashboard_security_group_id" {
+  description = "Security group ID for dashboard instance"
+  type        = string
+}
+
+variable "dashboard_subnet_id" {
+  description = "Subnet ID for dashboard instance"
+  type        = string
+}
+
+variable "renderer_subnet_ids" {
+  description = "Subnet IDs for renderer instances (multi-AZ)"
+  type        = list(string)
+}
+
+# =============================================================================
+# EC2 Spot Renderer Configuration
+# =============================================================================
+
+variable "spot_instance_type" {
+  description = "EC2 instance type for video rendering (Spot instances)"
+  type        = string
+  default     = "c5.xlarge"
+}
+
+variable "spot_max_price" {
+  description = "Maximum price for Spot instances (empty = on-demand price)"
+  type        = string
+  default     = ""
+}
+
+variable "spot_interruption_behavior" {
+  description = "Behavior when Spot instance is interrupted"
+  type        = string
+  default     = "terminate"
+
+  validation {
+    condition     = contains(["terminate", "stop", "hibernate"], var.spot_interruption_behavior)
+    error_message = "Interruption behavior must be terminate, stop, or hibernate."
+  }
+}
+
+variable "enable_detailed_monitoring" {
+  description = "Enable detailed CloudWatch monitoring for EC2 instances"
+  type        = bool
+  default     = false
+}
+
+# =============================================================================
+# EC2 Dashboard Configuration
+# =============================================================================
+
+variable "dashboard_instance_type" {
+  description = "EC2 instance type for admin dashboard"
+  type        = string
+  default     = "t3.micro"
+}
+
+variable "dashboard_enable_public_ip" {
+  description = "Enable public IP for dashboard instance"
+  type        = bool
+  default     = true
+}
+
+variable "dashboard_enable_elastic_ip" {
+  description = "Allocate Elastic IP for dashboard (stable IP for nip.io)"
+  type        = bool
+  default     = false
+}
+
+variable "dashboard_domain" {
+  description = "Domain name for dashboard (optional, for SSL cert)"
+  type        = string
+  default     = ""
+}
+
+# =============================================================================
+# Secrets Manager Secret Names (for EC2)
+# =============================================================================
+
+variable "youtube_credentials_secret_name" {
+  description = "Name of the YouTube credentials secret"
+  type        = string
+  default     = "manga-pipeline/youtube-credentials"
+}
+
+variable "admin_credentials_secret_name" {
+  description = "Name of the admin credentials secret"
+  type        = string
+  default     = "manga-pipeline/admin-credentials"
+}
+
+variable "jwt_secret_name" {
+  description = "Name of the JWT signing key secret"
+  type        = string
+  default     = "manga-pipeline/jwt-secret"
+}
+
+# =============================================================================
+# Step Functions Integration
+# =============================================================================
+
+variable "state_machine_arn" {
+  description = "ARN of the Step Functions state machine (for dashboard)"
+  type        = string
+  default     = ""
+}
+
+variable "cleanup_function_name" {
+  description = "Name of the cleanup Lambda function (for renderer)"
+  type        = string
+  default     = ""
+}
+
+# =============================================================================
 # Additional Tags
 # =============================================================================
 

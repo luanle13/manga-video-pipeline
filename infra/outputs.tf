@@ -114,7 +114,55 @@ output "compute_summary" {
 }
 
 # =============================================================================
+# Networking Outputs
+# =============================================================================
+
+output "vpc_id" {
+  description = "ID of the VPC"
+  value       = module.networking.vpc_id
+}
+
+output "security_group_ids" {
+  description = "Map of security group IDs"
+  value       = module.networking.security_group_ids
+}
+
+output "networking_summary" {
+  description = "Summary of networking resources"
+  value       = module.networking.networking_summary
+}
+
+# =============================================================================
+# EC2 Outputs
+# =============================================================================
+
+output "renderer_launch_template_id" {
+  description = "ID of the renderer launch template"
+  value       = module.compute.renderer_launch_template_id
+}
+
+output "dashboard_instance_id" {
+  description = "ID of the dashboard EC2 instance"
+  value       = module.compute.dashboard_instance_id
+}
+
+output "dashboard_public_ip" {
+  description = "Public IP of the dashboard instance"
+  value       = module.compute.dashboard_public_ip
+}
+
+output "dashboard_url" {
+  description = "HTTPS URL to access the dashboard"
+  value       = module.compute.dashboard_url
+}
+
+output "dashboard_nip_io_url" {
+  description = "nip.io URL for the dashboard"
+  value       = module.compute.dashboard_nip_io_url
+}
+
+# =============================================================================
 # Future Infrastructure Outputs (to be implemented)
 # =============================================================================
-# Step Functions, EC2, EventBridge, Secrets Manager, CloudWatch alarms,
-# VPC, Budget, etc. will be added as additional modules are created
+# Step Functions, EventBridge, Secrets Manager, CloudWatch alarms,
+# Budget, etc. will be added as additional modules are created
