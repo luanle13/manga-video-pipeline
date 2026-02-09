@@ -1,0 +1,415 @@
+# =============================================================================
+# Manga Video Pipeline - Deployment Workflow
+# =============================================================================
+# Deploys infrastructure, Lambda functions, and dashboard on push to main
+# =============================================================================
+
+name: Deploy
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      deploy_infra:
+        description: "Deploy infrastructure changes"
+        required: false
+        default: "true"
+        type: boolean
+      deploy_lambdas:
+        description: "Deploy Lambda functions"
+        required: false
+        default: "true"
+        type: boolean
+      deploy_dashboard:
+        description: "Deploy dashboard"
+        required: false
+        default: "true"
+        type: boolean
+
+# Ensure only one deployment runs at a time
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  AWS_REGION: ap-southeast-1
+  PYTHON_VERSION: "3.12"
+  TERRAFORM_VERSION: "1.7"
+  PROJECT_NAME: manga-video-pipeline
+
+jobs:
+  # ===========================================================================
+  # CI Check - Ensure tests pass before deploying
+  # ===========================================================================
+  ci-check:
+    name: CI Check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check CI workflow status
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { data: runs } = await github.rest.actions.listWorkflowRuns({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              workflow_id: 'ci.yml',
+              head_sha: context.sha,
+              status: 'completed'
+            });
+
+            const successfulRun = runs.workflow_runs.find(run => run.conclusion === 'success');
+            if (!successfulRun) {
+              core.setFailed('CI workflow must pass before deploying');
+            }
+
+  # ===========================================================================
+  # Deploy Infrastructure
+  # ===========================================================================
+  deploy-infra:
+    name: Deploy Infrastructure
+    runs-on: ubuntu-latest
+    needs: ci-check
+    if: github.event.inputs.deploy_infra != 'false'
+
+    outputs:
+      s3_bucket: ${{ steps.terraform-output.outputs.s3_bucket }}
+      lambda_bucket: ${{ steps.terraform-output.outputs.lambda_bucket }}
+      dashboard_instance_id: ${{ steps.terraform-output.outputs.dashboard_instance_id }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TERRAFORM_VERSION }}
+          terraform_wrapper: false
+
+      - name: Terraform Init
+        working-directory: infra
+        run: terraform init
+
+      - name: Terraform Plan
+        id: plan
+        working-directory: infra
+        run: |
+          terraform plan \
+            -var="admin_ip=${{ secrets.ADMIN_IP }}" \
+            -var="budget_alert_email=${{ secrets.ALERT_EMAIL }}" \
+            -var="lambda_deployment_bucket=${{ env.PROJECT_NAME }}-deployments-${{ secrets.AWS_ACCOUNT_ID }}" \
+            -out=tfplan \
+            -no-color
+        continue-on-error: true
+
+      - name: Terraform Plan Status
+        if: steps.plan.outcome == 'failure'
+        run: exit 1
+
+      - name: Terraform Apply
+        working-directory: infra
+        run: terraform apply -auto-approve tfplan
+
+      - name: Get Terraform Outputs
+        id: terraform-output
+        working-directory: infra
+        run: |
+          echo "s3_bucket=$(terraform output -raw s3_bucket_name)" >> $GITHUB_OUTPUT
+          echo "lambda_bucket=${{ env.PROJECT_NAME }}-deployments-${{ secrets.AWS_ACCOUNT_ID }}" >> $GITHUB_OUTPUT
+          echo "dashboard_instance_id=$(terraform output -raw dashboard_instance_id)" >> $GITHUB_OUTPUT
+
+  # ===========================================================================
+  # Deploy Lambda Functions
+  # ===========================================================================
+  deploy-lambdas:
+    name: Deploy Lambda Functions
+    runs-on: ubuntu-latest
+    needs: deploy-infra
+    if: always() && (needs.deploy-infra.result == 'success' || needs.deploy-infra.result == 'skipped') && github.event.inputs.deploy_lambdas != 'false'
+
+    strategy:
+      matrix:
+        lambda:
+          - name: manga-fetcher
+            source: src/fetcher
+            handler: handler.handler
+          - name: script-generator
+            source: src/scriptgen
+            handler: handler.handler
+          - name: tts-processor
+            source: src/ttsgen
+            handler: handler.handler
+          - name: quota-checker
+            source: src/quota
+            handler: handler.handler
+          - name: cleanup
+            source: src/cleanup
+            handler: handler.handler
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ env.PYTHON_VERSION }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt -t package/
+
+      - name: Package Lambda function
+        id: package
+        run: |
+          # Create package directory structure
+          mkdir -p package
+
+          # Copy Lambda source code
+          cp -r ${{ matrix.lambda.source }}/* package/
+
+          # Copy common module
+          cp -r src/common package/
+
+          # Create version file
+          echo "${{ github.sha }}" > package/VERSION
+
+          # Create zip package
+          cd package
+          zip -r ../lambda-${{ matrix.lambda.name }}.zip . -x "*.pyc" -x "__pycache__/*" -x "*.egg-info/*"
+          cd ..
+
+          # Calculate hash for versioning
+          HASH=$(sha256sum lambda-${{ matrix.lambda.name }}.zip | cut -d' ' -f1 | head -c 8)
+          echo "hash=$HASH" >> $GITHUB_OUTPUT
+          echo "Package hash: $HASH"
+
+      - name: Upload to S3
+        run: |
+          aws s3 cp lambda-${{ matrix.lambda.name }}.zip \
+            s3://${{ needs.deploy-infra.outputs.lambda_bucket || format('{0}-deployments-{1}', env.PROJECT_NAME, secrets.AWS_ACCOUNT_ID) }}/lambda-packages/${{ matrix.lambda.name }}-${{ steps.package.outputs.hash }}.zip
+
+      - name: Update Lambda function code
+        run: |
+          aws lambda update-function-code \
+            --function-name ${{ env.PROJECT_NAME }}-${{ matrix.lambda.name }} \
+            --s3-bucket ${{ needs.deploy-infra.outputs.lambda_bucket || format('{0}-deployments-{1}', env.PROJECT_NAME, secrets.AWS_ACCOUNT_ID) }} \
+            --s3-key lambda-packages/${{ matrix.lambda.name }}-${{ steps.package.outputs.hash }}.zip \
+            --publish
+
+      - name: Wait for Lambda update
+        run: |
+          aws lambda wait function-updated \
+            --function-name ${{ env.PROJECT_NAME }}-${{ matrix.lambda.name }}
+          echo "Lambda ${{ matrix.lambda.name }} updated successfully"
+
+  # ===========================================================================
+  # Deploy Dashboard
+  # ===========================================================================
+  deploy-dashboard:
+    name: Deploy Dashboard
+    runs-on: ubuntu-latest
+    needs: deploy-infra
+    if: always() && (needs.deploy-infra.result == 'success' || needs.deploy-infra.result == 'skipped') && github.event.inputs.deploy_dashboard != 'false'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Package dashboard code
+        run: |
+          # Create dashboard package
+          mkdir -p dashboard-package
+
+          # Copy dashboard source
+          cp -r src/dashboard/* dashboard-package/ 2>/dev/null || true
+          cp -r dashboard/* dashboard-package/ 2>/dev/null || true
+
+          # Copy templates if they exist
+          cp -r templates/* dashboard-package/templates/ 2>/dev/null || true
+
+          # Create version file
+          echo "${{ github.sha }}" > dashboard-package/VERSION
+          echo "$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> dashboard-package/VERSION
+
+          # Create tarball
+          tar -czvf dashboard-${{ github.sha }}.tar.gz -C dashboard-package .
+
+          echo "Dashboard package created"
+
+      - name: Upload dashboard to S3
+        run: |
+          aws s3 cp dashboard-${{ github.sha }}.tar.gz \
+            s3://${{ needs.deploy-infra.outputs.s3_bucket || format('{0}-assets', env.PROJECT_NAME) }}/dashboard/dashboard-${{ github.sha }}.tar.gz
+
+          # Also upload as 'latest' for easy reference
+          aws s3 cp dashboard-${{ github.sha }}.tar.gz \
+            s3://${{ needs.deploy-infra.outputs.s3_bucket || format('{0}-assets', env.PROJECT_NAME) }}/dashboard/dashboard-latest.tar.gz
+
+      - name: Get Dashboard Instance ID
+        id: get-instance
+        run: |
+          INSTANCE_ID="${{ needs.deploy-infra.outputs.dashboard_instance_id }}"
+
+          if [ -z "$INSTANCE_ID" ]; then
+            # Fallback: get instance ID by tag
+            INSTANCE_ID=$(aws ec2 describe-instances \
+              --filters "Name=tag:Name,Values=${{ env.PROJECT_NAME }}-dashboard" \
+                        "Name=instance-state-name,Values=running" \
+              --query 'Reservations[0].Instances[0].InstanceId' \
+              --output text)
+          fi
+
+          echo "instance_id=$INSTANCE_ID" >> $GITHUB_OUTPUT
+          echo "Dashboard instance: $INSTANCE_ID"
+
+      - name: Deploy via SSM Run Command
+        run: |
+          COMMAND_ID=$(aws ssm send-command \
+            --instance-ids ${{ steps.get-instance.outputs.instance_id }} \
+            --document-name "AWS-RunShellScript" \
+            --comment "Deploy dashboard ${{ github.sha }}" \
+            --parameters 'commands=[
+              "set -e",
+              "cd /opt/dashboard",
+              "aws s3 cp s3://${{ needs.deploy-infra.outputs.s3_bucket || format('{0}-assets', env.PROJECT_NAME) }}/dashboard/dashboard-${{ github.sha }}.tar.gz /tmp/dashboard.tar.gz",
+              "sudo tar -xzf /tmp/dashboard.tar.gz -C /opt/dashboard --strip-components=0",
+              "sudo chown -R dashboard:dashboard /opt/dashboard",
+              "sudo systemctl restart dashboard",
+              "sleep 5",
+              "sudo systemctl status dashboard --no-pager",
+              "echo Dashboard deployed successfully: ${{ github.sha }}"
+            ]' \
+            --timeout-seconds 300 \
+            --query 'Command.CommandId' \
+            --output text)
+
+          echo "SSM Command ID: $COMMAND_ID"
+          echo "command_id=$COMMAND_ID" >> $GITHUB_ENV
+
+      - name: Wait for deployment
+        run: |
+          # Wait for command to complete
+          aws ssm wait command-executed \
+            --command-id ${{ env.command_id }} \
+            --instance-id ${{ steps.get-instance.outputs.instance_id }} \
+            || true
+
+          # Get command result
+          RESULT=$(aws ssm get-command-invocation \
+            --command-id ${{ env.command_id }} \
+            --instance-id ${{ steps.get-instance.outputs.instance_id }} \
+            --query 'Status' \
+            --output text)
+
+          echo "Command status: $RESULT"
+
+          if [ "$RESULT" != "Success" ]; then
+            # Get error output
+            aws ssm get-command-invocation \
+              --command-id ${{ env.command_id }} \
+              --instance-id ${{ steps.get-instance.outputs.instance_id }} \
+              --query 'StandardErrorContent' \
+              --output text
+            exit 1
+          fi
+
+  # ===========================================================================
+  # Post-Deployment Verification
+  # ===========================================================================
+  verify-deployment:
+    name: Verify Deployment
+    runs-on: ubuntu-latest
+    needs: [deploy-infra, deploy-lambdas, deploy-dashboard]
+    if: always() && !cancelled()
+
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Verify Lambda functions
+        run: |
+          echo "Verifying Lambda functions..."
+          for func in manga-fetcher script-generator tts-processor quota-checker cleanup; do
+            STATE=$(aws lambda get-function \
+              --function-name ${{ env.PROJECT_NAME }}-$func \
+              --query 'Configuration.State' \
+              --output text 2>/dev/null || echo "NOT_FOUND")
+
+            if [ "$STATE" = "Active" ]; then
+              echo "✓ $func: Active"
+            else
+              echo "✗ $func: $STATE"
+            fi
+          done
+
+      - name: Verify Step Functions
+        run: |
+          echo "Verifying Step Functions state machine..."
+          STATUS=$(aws stepfunctions describe-state-machine \
+            --state-machine-arn arn:aws:states:${{ env.AWS_REGION }}:${{ secrets.AWS_ACCOUNT_ID }}:stateMachine:${{ env.PROJECT_NAME }}-pipeline \
+            --query 'status' \
+            --output text 2>/dev/null || echo "NOT_FOUND")
+
+          echo "State Machine status: $STATUS"
+
+      - name: Verify Dashboard health
+        run: |
+          echo "Verifying Dashboard..."
+          DASHBOARD_IP=$(aws ec2 describe-instances \
+            --filters "Name=tag:Name,Values=${{ env.PROJECT_NAME }}-dashboard" \
+                      "Name=instance-state-name,Values=running" \
+            --query 'Reservations[0].Instances[0].PublicIpAddress' \
+            --output text)
+
+          if [ -n "$DASHBOARD_IP" ] && [ "$DASHBOARD_IP" != "None" ]; then
+            echo "Dashboard IP: $DASHBOARD_IP"
+            # Try to reach health endpoint (ignore SSL for self-signed cert)
+            curl -sk --max-time 10 "https://$DASHBOARD_IP/health" || echo "Health check pending..."
+          else
+            echo "Dashboard IP not available"
+          fi
+
+      - name: Deployment Summary
+        run: |
+          echo "========================================"
+          echo "       DEPLOYMENT SUMMARY"
+          echo "========================================"
+          echo "Commit: ${{ github.sha }}"
+          echo "Branch: ${{ github.ref_name }}"
+          echo "Triggered by: ${{ github.actor }}"
+          echo "Time: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          echo ""
+          echo "Jobs Status:"
+          echo "  Infrastructure: ${{ needs.deploy-infra.result }}"
+          echo "  Lambda Functions: ${{ needs.deploy-lambdas.result }}"
+          echo "  Dashboard: ${{ needs.deploy-dashboard.result }}"
+          echo "========================================"
