@@ -185,8 +185,40 @@ module "scheduling" {
 }
 
 # =============================================================================
+# Monitoring Module - CloudWatch Alarms and Dashboard
+# =============================================================================
+
+module "monitoring" {
+  source = "./modules/monitoring"
+
+  project_name = var.project_name
+  environment  = var.environment
+
+  # Notification configuration
+  alarm_email      = var.budget_alert_email
+  create_sns_topic = true
+
+  # Step Functions monitoring
+  state_machine_name = module.compute.state_machine_name
+
+  # Lambda monitoring thresholds
+  lambda_error_threshold = var.lambda_error_threshold
+
+  # EC2 Spot monitoring
+  enable_spot_interruption_alarm = var.enable_spot_interruption_handling
+
+  # Optional dashboard
+  create_dashboard = var.create_cloudwatch_dashboard
+
+  # Alarm actions
+  enable_alarm_actions = true
+
+  # Additional tags
+  tags = var.additional_tags
+}
+
+# =============================================================================
 # Additional modules can be added here:
-# - Secrets Manager secrets (if not created manually)
-# - CloudWatch alarms
-# - SNS topics for notifications
+# - Budget alerts
+# - Custom metrics
 # =============================================================================

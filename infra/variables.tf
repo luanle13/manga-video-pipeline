@@ -453,6 +453,27 @@ variable "enable_cost_allocation_tags" {
 }
 
 # =============================================================================
+# CloudWatch Monitoring Variables
+# =============================================================================
+
+variable "lambda_error_threshold" {
+  description = "Number of Lambda errors per hour to trigger alarm"
+  type        = number
+  default     = 3
+
+  validation {
+    condition     = var.lambda_error_threshold >= 1
+    error_message = "Lambda error threshold must be at least 1."
+  }
+}
+
+variable "create_cloudwatch_dashboard" {
+  description = "Create CloudWatch dashboard for pipeline monitoring (optional)"
+  type        = bool
+  default     = false
+}
+
+# =============================================================================
 # Tags
 # =============================================================================
 

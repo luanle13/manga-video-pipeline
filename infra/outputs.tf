@@ -205,6 +205,44 @@ output "schedule_enabled" {
 }
 
 # =============================================================================
+# Secrets Manager Outputs
+# =============================================================================
+
+output "secret_arns" {
+  description = "Map of Secrets Manager secret ARNs"
+  value       = module.security.secret_arns
+}
+
+output "deepinfra_secret_arn" {
+  description = "ARN of the DeepInfra API key secret"
+  value       = module.security.deepinfra_secret_arn
+}
+
+output "youtube_oauth_secret_arn" {
+  description = "ARN of the YouTube OAuth secret"
+  value       = module.security.youtube_oauth_secret_arn
+}
+
+output "admin_credentials_secret_arn" {
+  description = "ARN of the admin credentials secret"
+  value       = module.security.admin_credentials_secret_arn
+}
+
+# =============================================================================
+# Monitoring Outputs
+# =============================================================================
+
+output "sns_topic_arn" {
+  description = "ARN of the SNS topic for alarm notifications"
+  value       = module.monitoring.sns_topic_arn
+}
+
+output "monitoring_summary" {
+  description = "Summary of monitoring resources"
+  value       = module.monitoring.monitoring_summary
+}
+
+# =============================================================================
 # Pipeline Summary
 # =============================================================================
 
@@ -224,5 +262,10 @@ output "pipeline_summary" {
       url        = module.compute.dashboard_url
       nip_io_url = module.compute.dashboard_nip_io_url
     }
+    monitoring = {
+      sns_topic      = module.monitoring.sns_topic_arn
+      alarms_created = module.monitoring.monitoring_summary.alarms
+    }
+    secrets = module.security.secret_arns
   }
 }
