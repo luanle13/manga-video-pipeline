@@ -1,0 +1,21 @@
+{
+  "result": "ok",
+  "baseUrl": "https://uploads.mangadex.org",
+  "chapter": {
+    "hash": "abc123def456ghi789jkl012mno345pqr",
+    "data": [
+      "page-001-highres.jpg",
+      "page-002-highres.jpg",
+      "page-003-highres.jpg",
+      "page-004-highres.jpg",
+      "page-005-highres.jpg"
+    ],
+    "dataSaver": [
+      "page-001-lowres.jpg",
+      "page-002-lowres.jpg",
+      "page-003-lowres.jpg",
+      "page-004-lowres.jpg",
+      "page-005-lowres.jpg"
+    ]
+  }
+}

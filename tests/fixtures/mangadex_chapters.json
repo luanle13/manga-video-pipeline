@@ -1,0 +1,149 @@
+{
+  "result": "ok",
+  "response": "collection",
+  "data": [
+    {
+      "id": "chapter-001-uuid",
+      "type": "chapter",
+      "attributes": {
+        "volume": "1",
+        "chapter": "1",
+        "title": "Khởi đầu mới",
+        "translatedLanguage": "vi",
+        "externalUrl": null,
+        "publishAt": "2024-01-10T10:00:00+00:00",
+        "readableAt": "2024-01-10T10:00:00+00:00",
+        "createdAt": "2024-01-10T09:00:00+00:00",
+        "updatedAt": "2024-01-10T10:00:00+00:00",
+        "pages": 5,
+        "version": 1
+      },
+      "relationships": [
+        {
+          "id": "manga-uuid-12345",
+          "type": "manga"
+        },
+        {
+          "id": "scanlation-group-uuid-001",
+          "type": "scanlation_group",
+          "attributes": {
+            "name": "Vietnamese Manga Scans"
+          }
+        },
+        {
+          "id": "uploader-uuid-001",
+          "type": "user"
+        }
+      ]
+    },
+    {
+      "id": "chapter-002-uuid",
+      "type": "chapter",
+      "attributes": {
+        "volume": "1",
+        "chapter": "2",
+        "title": "Cuộc phiêu lưu bắt đầu",
+        "translatedLanguage": "vi",
+        "externalUrl": null,
+        "publishAt": "2024-01-11T10:00:00+00:00",
+        "readableAt": "2024-01-11T10:00:00+00:00",
+        "createdAt": "2024-01-11T09:00:00+00:00",
+        "updatedAt": "2024-01-11T10:00:00+00:00",
+        "pages": 5,
+        "version": 1
+      },
+      "relationships": [
+        {
+          "id": "manga-uuid-12345",
+          "type": "manga"
+        },
+        {
+          "id": "scanlation-group-uuid-001",
+          "type": "scanlation_group",
+          "attributes": {
+            "name": "Vietnamese Manga Scans"
+          }
+        }
+      ]
+    },
+    {
+      "id": "chapter-003-uuid",
+      "type": "chapter",
+      "attributes": {
+        "volume": "1",
+        "chapter": "3",
+        "title": "Người bạn mới",
+        "translatedLanguage": "vi",
+        "externalUrl": null,
+        "publishAt": "2024-01-12T10:00:00+00:00",
+        "readableAt": "2024-01-12T10:00:00+00:00",
+        "createdAt": "2024-01-12T09:00:00+00:00",
+        "updatedAt": "2024-01-12T10:00:00+00:00",
+        "pages": 5,
+        "version": 1
+      },
+      "relationships": [
+        {
+          "id": "manga-uuid-12345",
+          "type": "manga"
+        },
+        {
+          "id": "scanlation-group-uuid-001",
+          "type": "scanlation_group",
+          "attributes": {
+            "name": "Vietnamese Manga Scans"
+          }
+        }
+      ]
+    },
+    {
+      "id": "chapter-004-uuid",
+      "type": "chapter",
+      "attributes": {
+        "volume": "1",
+        "chapter": "4",
+        "title": "Thử thách đầu tiên",
+        "translatedLanguage": "vi",
+        "externalUrl": null,
+        "publishAt": "2024-01-13T10:00:00+00:00",
+        "readableAt": "2024-01-13T10:00:00+00:00",
+        "createdAt": "2024-01-13T09:00:00+00:00",
+        "updatedAt": "2024-01-13T10:00:00+00:00",
+        "pages": 6,
+        "version": 1
+      },
+      "relationships": [
+        {
+          "id": "manga-uuid-12345",
+          "type": "manga"
+        }
+      ]
+    },
+    {
+      "id": "chapter-005-uuid",
+      "type": "chapter",
+      "attributes": {
+        "volume": "1",
+        "chapter": "5",
+        "title": "Chiến thắng vinh quang",
+        "translatedLanguage": "vi",
+        "externalUrl": null,
+        "publishAt": "2024-01-14T10:00:00+00:00",
+        "readableAt": "2024-01-14T10:00:00+00:00",
+        "createdAt": "2024-01-14T09:00:00+00:00",
+        "updatedAt": "2024-01-14T10:00:00+00:00",
+        "pages": 7,
+        "version": 1
+      },
+      "relationships": [
+        {
+          "id": "manga-uuid-12345",
+          "type": "manga"
+        }
+      ]
+    }
+  ],
+  "limit": 100,
+  "offset": 0,
+  "total": 5
+}

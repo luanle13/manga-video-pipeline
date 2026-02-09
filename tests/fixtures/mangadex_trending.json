@@ -1,0 +1,190 @@
+{
+  "result": "ok",
+  "response": "collection",
+  "data": [
+    {
+      "id": "manga-uuid-12345",
+      "type": "manga",
+      "attributes": {
+        "title": {
+          "en": "The Wonderful Adventure",
+          "vi": "Cuộc Phiêu Lưu Kỳ Diệu"
+        },
+        "altTitles": [
+          {"ja": "素晴らしい冒険"},
+          {"ko": "멋진 모험"}
+        ],
+        "description": {
+          "en": "A story about young heroes fighting to protect the world.",
+          "vi": "Một câu chuyện về những anh hùng trẻ tuổi chiến đấu để bảo vệ thế giới."
+        },
+        "isLocked": false,
+        "links": {
+          "al": "12345",
+          "mu": "67890"
+        },
+        "originalLanguage": "ja",
+        "lastVolume": "10",
+        "lastChapter": "100",
+        "publicationDemographic": "shounen",
+        "status": "ongoing",
+        "year": 2020,
+        "contentRating": "safe",
+        "tags": [
+          {
+            "id": "tag-action-uuid",
+            "type": "tag",
+            "attributes": {
+              "name": {"en": "Action"},
+              "group": "genre"
+            }
+          },
+          {
+            "id": "tag-adventure-uuid",
+            "type": "tag",
+            "attributes": {
+              "name": {"en": "Adventure"},
+              "group": "genre"
+            }
+          },
+          {
+            "id": "tag-fantasy-uuid",
+            "type": "tag",
+            "attributes": {
+              "name": {"en": "Fantasy"},
+              "group": "genre"
+            }
+          }
+        ],
+        "state": "published",
+        "createdAt": "2020-01-15T10:00:00+00:00",
+        "updatedAt": "2024-01-15T12:00:00+00:00",
+        "availableTranslatedLanguages": ["en", "vi", "ja", "ko"],
+        "latestUploadedChapter": "chapter-100-uuid"
+      },
+      "relationships": [
+        {
+          "id": "author-uuid-001",
+          "type": "author",
+          "attributes": {
+            "name": "Tanaka Sensei"
+          }
+        },
+        {
+          "id": "cover-uuid-001",
+          "type": "cover_art",
+          "attributes": {
+            "fileName": "cover-image.jpg",
+            "volume": "1"
+          }
+        }
+      ]
+    },
+    {
+      "id": "manga-uuid-67890",
+      "type": "manga",
+      "attributes": {
+        "title": {
+          "en": "Dragon's Legacy",
+          "vi": "Di Sản Của Rồng"
+        },
+        "altTitles": [
+          {"ja": "ドラゴンの遺産"}
+        ],
+        "description": {
+          "en": "An epic tale of dragons and their human companions.",
+          "vi": "Một câu chuyện sử thi về rồng và những người bạn đồng hành của chúng."
+        },
+        "isLocked": false,
+        "originalLanguage": "ja",
+        "lastVolume": "5",
+        "lastChapter": "50",
+        "publicationDemographic": "seinen",
+        "status": "ongoing",
+        "year": 2022,
+        "contentRating": "safe",
+        "tags": [
+          {
+            "id": "tag-fantasy-uuid",
+            "type": "tag",
+            "attributes": {
+              "name": {"en": "Fantasy"},
+              "group": "genre"
+            }
+          },
+          {
+            "id": "tag-drama-uuid",
+            "type": "tag",
+            "attributes": {
+              "name": {"en": "Drama"},
+              "group": "genre"
+            }
+          }
+        ],
+        "state": "published",
+        "createdAt": "2022-06-01T08:00:00+00:00",
+        "updatedAt": "2024-01-14T15:30:00+00:00",
+        "availableTranslatedLanguages": ["en", "vi"],
+        "latestUploadedChapter": "chapter-50-uuid"
+      },
+      "relationships": [
+        {
+          "id": "author-uuid-002",
+          "type": "author"
+        },
+        {
+          "id": "cover-uuid-002",
+          "type": "cover_art",
+          "attributes": {
+            "fileName": "dragon-cover.jpg",
+            "volume": "1"
+          }
+        }
+      ]
+    },
+    {
+      "id": "manga-uuid-11111",
+      "type": "manga",
+      "attributes": {
+        "title": {
+          "en": "School Days Romance",
+          "vi": "Tình Yêu Học Đường"
+        },
+        "description": {
+          "en": "A heartwarming story of high school romance.",
+          "vi": "Một câu chuyện ấm áp về tình yêu tuổi học trò."
+        },
+        "originalLanguage": "ja",
+        "status": "completed",
+        "year": 2019,
+        "contentRating": "safe",
+        "tags": [
+          {
+            "id": "tag-romance-uuid",
+            "type": "tag",
+            "attributes": {
+              "name": {"en": "Romance"},
+              "group": "genre"
+            }
+          }
+        ],
+        "state": "published",
+        "createdAt": "2019-03-10T10:00:00+00:00",
+        "updatedAt": "2023-12-01T10:00:00+00:00",
+        "availableTranslatedLanguages": ["en", "vi", "ja"]
+      },
+      "relationships": [
+        {
+          "id": "cover-uuid-003",
+          "type": "cover_art",
+          "attributes": {
+            "fileName": "school-cover.jpg"
+          }
+        }
+      ]
+    }
+  ],
+  "limit": 10,
+  "offset": 0,
+  "total": 3
+}

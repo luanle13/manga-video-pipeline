@@ -1,0 +1,23 @@
+{
+  "id": "chatcmpl-abc123def456",
+  "object": "chat.completion",
+  "created": 1705312800,
+  "model": "Qwen/Qwen2.5-72B-Instruct",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "Xin chào các bạn! Hôm nay chúng ta sẽ cùng theo dõi câu chuyện tuyệt vời \"Cuộc Phiêu Lưu Kỳ Diệu\".\n\nTrong chương đầu tiên, chúng ta gặp nhân vật chính - một chàng trai trẻ tên là Minh với ước mơ trở thành anh hùng vĩ đại nhất thế giới. Minh sinh ra trong một ngôi làng nhỏ ở vùng núi cao, nơi người dân sống yên bình và hạnh phúc. Nhưng mọi thứ đã thay đổi khi một con quái vật xuất hiện và đe dọa ngôi làng.\n\nNhìn vào trang đầu tiên, chúng ta thấy Minh đang đứng trước ngôi làng của mình với ánh mắt đầy quyết tâm. Cậu ấy biết rằng đây là lúc để chứng minh bản thân.\n\nTiếp theo, ở những trang sau, Minh bắt đầu cuộc hành trình của mình. Cậu ấy gặp nhiều thử thách trên đường đi, từ những khu rừng rậm đầy nguy hiểm đến những sa mạc khô cằn. Nhưng với sự kiên trì và lòng dũng cảm, Minh không bao giờ bỏ cuộc.\n\nTrong chương hai, Minh gặp được người bạn đồng hành đầu tiên - một cô gái tên Lan với khả năng ma thuật đặc biệt. Lan đã giúp Minh vượt qua nhiều khó khăn và hai người dần trở thành đôi bạn thân thiết.\n\nChương ba mang đến những thử thách mới. Minh và Lan phải đối mặt với kẻ thù đầu tiên - một pháp sư đen tối với sức mạnh ghê gớm. Trận chiến diễn ra vô cùng khốc liệt, nhưng cuối cùng, với sự hợp tác của cả hai, họ đã chiến thắng.\n\nĐây là kết thúc của tập đầu tiên, nhưng câu chuyện vẫn còn tiếp tục. Các bạn đừng quên theo dõi những tập tiếp theo để xem Minh và Lan sẽ phải đối mặt với những thử thách gì nhé!\n\nCảm ơn các bạn đã theo dõi. Hẹn gặp lại trong video tiếp theo!"
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 1250,
+    "completion_tokens": 580,
+    "total_tokens": 1830
+  },
+  "system_fingerprint": "fp_abc123"
+}
