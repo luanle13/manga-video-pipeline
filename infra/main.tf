@@ -210,6 +210,10 @@ module "monitoring" {
   # Optional dashboard
   create_dashboard = var.create_cloudwatch_dashboard
 
+  # AWS Budget configuration
+  create_budget        = true
+  monthly_budget_limit = var.monthly_budget_limit
+
   # Alarm actions
   enable_alarm_actions = true
 
@@ -219,6 +223,6 @@ module "monitoring" {
 
 # =============================================================================
 # Additional modules can be added here:
-# - Budget alerts
 # - Custom metrics
+# - Additional alarms
 # =============================================================================

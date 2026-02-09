@@ -84,6 +84,28 @@ output "dashboard_name" {
 }
 
 # =============================================================================
+# Budget Outputs
+# =============================================================================
+
+output "monthly_budget_name" {
+  description = "Name of the monthly cost budget"
+  value       = var.create_budget ? aws_budgets_budget.monthly_budget[0].name : null
+}
+
+output "monthly_budget_id" {
+  description = "ID of the monthly cost budget"
+  value       = var.create_budget ? aws_budgets_budget.monthly_budget[0].id : null
+}
+
+output "budget_thresholds" {
+  description = "Budget alert thresholds in USD"
+  value = var.create_budget ? {
+    for threshold in var.budget_alert_thresholds :
+    "${threshold}pct" => floor(var.monthly_budget_limit * threshold / 100)
+  } : null
+}
+
+# =============================================================================
 # Monitoring Summary
 # =============================================================================
 
@@ -101,6 +123,12 @@ output "monitoring_summary" {
       step_functions    = 3 # failed, timed_out, aborted
       dynamodb_throttle = length(aws_cloudwatch_metric_alarm.dynamodb_throttle)
       spot_interruption = var.enable_spot_interruption_alarm ? 1 : 0
+    }
+    budgets = {
+      created           = var.create_budget
+      monthly_limit_usd = var.create_budget ? var.monthly_budget_limit : null
+      thresholds        = var.create_budget ? var.budget_alert_thresholds : null
+      budgets_count     = var.create_budget ? 3 : 0 # monthly, ec2-spot, lambda
     }
     dashboard = {
       created = var.create_dashboard

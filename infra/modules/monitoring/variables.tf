@@ -129,6 +129,38 @@ variable "treat_missing_data" {
 }
 
 # =============================================================================
+# AWS Budget Configuration
+# =============================================================================
+
+variable "create_budget" {
+  description = "Create AWS Budget for cost monitoring"
+  type        = bool
+  default     = true
+}
+
+variable "monthly_budget_limit" {
+  description = "Monthly budget limit in USD"
+  type        = number
+  default     = 120
+
+  validation {
+    condition     = var.monthly_budget_limit > 0
+    error_message = "Monthly budget limit must be greater than 0."
+  }
+}
+
+variable "budget_alert_thresholds" {
+  description = "Budget alert thresholds as percentages"
+  type        = list(number)
+  default     = [65, 100, 120]
+
+  validation {
+    condition     = length(var.budget_alert_thresholds) > 0
+    error_message = "At least one budget alert threshold is required."
+  }
+}
+
+# =============================================================================
 # Additional Tags
 # =============================================================================
 
