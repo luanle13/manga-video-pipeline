@@ -544,6 +544,7 @@ resource "aws_iam_role_policy" "ec2_renderer" {
         Sid    = "StatesTaskCallbackAccess"
         Effect = "Allow"
         Action = [
+          "states:GetActivityTask",
           "states:SendTaskSuccess",
           "states:SendTaskHeartbeat",
           "states:SendTaskFailure"

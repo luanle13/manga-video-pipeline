@@ -168,19 +168,6 @@
         "Overwrite": true
       },
       "ResultPath": "$.ssmResult",
-      "Next": "StoreTaskToken"
-    },
-    "StoreTaskToken": {
-      "Type": "Task",
-      "Resource": "arn:aws:states:::aws-sdk:ssm:putParameter",
-      "Comment": "Store task token in SSM for renderer callback",
-      "Parameters": {
-        "Name": "/${project_name}/renderer/task-token",
-        "Value.$": "$$.Task.Token",
-        "Type": "SecureString",
-        "Overwrite": true
-      },
-      "ResultPath": "$.tokenResult",
       "Next": "LaunchRenderer"
     },
     "LaunchRenderer": {
@@ -215,8 +202,8 @@
     },
     "WaitForRender": {
       "Type": "Task",
-      "Resource": "arn:aws:states:::aws-sdk:sfn:getActivityTask.waitForTaskToken",
-      "Comment": "Wait for rendering to complete (callback from EC2 instance)",
+      "Resource": "${renderer_activity_arn}",
+      "Comment": "Wait for rendering to complete (EC2 instance calls GetActivityTask then SendTaskSuccess)",
       "HeartbeatSeconds": 300,
       "TimeoutSeconds": 14400,
       "ResultPath": "$.renderResult",

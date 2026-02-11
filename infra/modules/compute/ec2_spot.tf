@@ -109,6 +109,7 @@ resource "aws_launch_template" "renderer" {
     youtube_secret_name   = var.youtube_credentials_secret_name
     cleanup_function_name = var.cleanup_function_name
     log_level             = var.log_level
+    activity_arn          = aws_sfn_activity.renderer.id
   }))
 
   # Instance tags
@@ -190,22 +191,4 @@ resource "aws_ssm_parameter" "renderer_job_id" {
   }
 }
 
-# SSM Parameter for Step Functions task token (for callback)
-resource "aws_ssm_parameter" "renderer_task_token" {
-  name        = "/${var.project_name}/renderer/task-token"
-  description = "Step Functions task token for renderer callback"
-  type        = "SecureString"
-  value       = "none" # Placeholder - Step Functions updates this
-
-  tags = merge(
-    local.common_tags,
-    {
-      Name      = "${var.project_name}-renderer-task-token"
-      Component = "renderer"
-    }
-  )
-
-  lifecycle {
-    ignore_changes = [value] # Value is managed by Step Functions
-  }
-}
+# Note: Task token is now retrieved via GetActivityTask, not SSM

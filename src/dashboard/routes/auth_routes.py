@@ -1,11 +1,13 @@
 """Authentication routes for admin dashboard."""
 
+import os
+
 from fastapi import APIRouter, Depends, Form, HTTPException, Request, Response, status
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 
 from src.common.logging_config import setup_logger
-from src.common.secrets import SecretsClient
+from src.common.secrets import SecretsClient, SecretNotFoundError
 from src.dashboard.auth import (
     clear_auth_cookie,
     create_access_token,
@@ -20,6 +22,15 @@ router = APIRouter(tags=["Authentication"])
 # Templates will be configured by main app
 templates: Jinja2Templates | None = None
 
+# Default admin credentials for local development
+# In production, these should be stored in AWS Secrets Manager
+DEFAULT_ADMIN_USERNAME = os.environ.get("ADMIN_USERNAME", "admin")
+DEFAULT_ADMIN_PASSWORD_HASH = os.environ.get(
+    "ADMIN_PASSWORD_HASH",
+    # bcrypt hash for "Luan@130201"
+    "$2b$12$8LjdzKzMSOkU0S/BWYL9uOaASFgTV3hZcNnGSHw9Ec68WUYLA29Ja",
+)
+
 
 def set_templates(jinja_templates: Jinja2Templates):
     """Set Jinja2 templates instance."""
@@ -29,7 +40,7 @@ def set_templates(jinja_templates: Jinja2Templates):
 
 def get_admin_credentials(request: Request) -> dict:
     """
-    Get admin credentials from Secrets Manager.
+    Get admin credentials from Secrets Manager or environment fallback.
 
     Returns:
         Dict with 'username' and 'password_hash' keys.
@@ -39,9 +50,23 @@ def get_admin_credentials(request: Request) -> dict:
 
     # Get admin credentials from Secrets Manager
     secret_name = request.app.state.admin_secret_name
-    credentials = secrets_client.get_secret(secret_name)
 
-    return credentials
+    try:
+        credentials = secrets_client.get_secret_json(secret_name)
+        return {
+            "username": credentials.get("username", "admin"),
+            "password_hash": credentials.get("password_hash", ""),
+        }
+    except (SecretNotFoundError, Exception) as e:
+        # Fallback to environment variables for local development
+        logger.warning(
+            "Could not retrieve admin credentials from Secrets Manager, using fallback",
+            extra={"error": str(e)},
+        )
+        return {
+            "username": DEFAULT_ADMIN_USERNAME,
+            "password_hash": DEFAULT_ADMIN_PASSWORD_HASH,
+        }
 
 
 @router.get("/login", response_class=HTMLResponse)

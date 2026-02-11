@@ -20,10 +20,10 @@ DYNAMODB_JOBS_TABLE="${dynamodb_jobs_table}"
 YOUTUBE_SECRET_NAME="${youtube_secret_name}"
 CLEANUP_FUNCTION_NAME="${cleanup_function_name}"
 LOG_LEVEL="${log_level}"
+ACTIVITY_ARN="${activity_arn}"
 
 # SSM parameter paths
 JOB_ID_PARAM="/$PROJECT_NAME/renderer/current-job-id"
-TASK_TOKEN_PARAM="/$PROJECT_NAME/renderer/task-token"
 
 # Logging setup
 LOG_GROUP="/aws/ec2/$PROJECT_NAME-renderer"
@@ -101,13 +101,29 @@ fi
 
 log "Processing job: $JOB_ID"
 
-# Get task token for Step Functions callback
-TASK_TOKEN=$(aws ssm get-parameter \
-    --name "$TASK_TOKEN_PARAM" \
-    --with-decryption \
-    --region "$REGION" \
-    --query 'Parameter.Value' \
-    --output text)
+# Get task from Step Functions Activity (this blocks until a task is available)
+log "Polling for Step Functions Activity task..."
+ACTIVITY_RESPONSE=$(aws stepfunctions get-activity-task \
+    --activity-arn "$ACTIVITY_ARN" \
+    --worker-name "$INSTANCE_ID" \
+    --region "$REGION")
+
+TASK_TOKEN=$(echo "$ACTIVITY_RESPONSE" | jq -r '.taskToken')
+TASK_INPUT=$(echo "$ACTIVITY_RESPONSE" | jq -r '.input')
+
+if [ -z "$TASK_TOKEN" ] || [ "$TASK_TOKEN" = "null" ]; then
+    log "ERROR: Failed to get task token from Activity"
+    exit 1
+fi
+
+log "Received task token from Activity"
+
+# Override JOB_ID from task input if available
+TASK_JOB_ID=$(echo "$TASK_INPUT" | jq -r '.job_id // empty')
+if [ -n "$TASK_JOB_ID" ]; then
+    JOB_ID="$TASK_JOB_ID"
+    log "Using job_id from task input: $JOB_ID"
+fi
 
 # =============================================================================
 # 3. Download and Setup Application Code

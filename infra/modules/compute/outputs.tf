@@ -202,9 +202,9 @@ output "renderer_job_id_parameter_name" {
   value       = aws_ssm_parameter.renderer_job_id.name
 }
 
-output "renderer_task_token_parameter_name" {
-  description = "SSM parameter name for renderer task token"
-  value       = aws_ssm_parameter.renderer_task_token.name
+output "renderer_activity_arn" {
+  description = "ARN of the Step Functions Activity for renderer callback"
+  value       = aws_sfn_activity.renderer.id
 }
 
 # =============================================================================

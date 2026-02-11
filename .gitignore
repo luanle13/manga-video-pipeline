@@ -216,3 +216,4 @@ CLAUDE.md
 *.tfvars
 .terraformrc
 terraform.rc
+tfplan

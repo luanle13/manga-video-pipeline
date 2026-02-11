@@ -2,6 +2,7 @@
 
 from datetime import datetime, timedelta
 from typing import Any
+from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.responses import HTMLResponse
@@ -12,7 +13,20 @@ from src.common.db import DynamoDBClient
 from src.common.logging_config import setup_logger
 from src.common.models import JobStatus
 from src.dashboard.auth import get_current_user
-from src.scheduler.quota_checker import get_vietnam_today
+
+# Vietnam timezone
+VIETNAM_TZ = ZoneInfo("Asia/Ho_Chi_Minh")
+
+
+def get_vietnam_today() -> str:
+    """
+    Get today's date in Vietnam timezone (UTC+7).
+
+    Returns:
+        Date string in YYYY-MM-DD format.
+    """
+    now_vietnam = datetime.now(VIETNAM_TZ)
+    return now_vietnam.date().isoformat()
 
 logger = setup_logger(__name__)
 

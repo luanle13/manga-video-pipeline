@@ -23,6 +23,22 @@ resource "aws_cloudwatch_log_group" "step_functions" {
 }
 
 # =============================================================================
+# Step Functions Activity for Renderer Callback
+# =============================================================================
+
+resource "aws_sfn_activity" "renderer" {
+  name = "${var.project_name}-renderer-activity"
+
+  tags = merge(
+    local.common_tags,
+    {
+      Name      = "${var.project_name}-renderer-activity"
+      Component = "step-functions"
+    }
+  )
+}
+
+# =============================================================================
 # Step Functions State Machine
 # =============================================================================
 
@@ -40,6 +56,7 @@ resource "aws_sfn_state_machine" "pipeline" {
     ttsgen_arn               = aws_lambda_function.tts_processor.arn
     cleanup_arn              = aws_lambda_function.cleanup.arn
     renderer_launch_template = aws_launch_template.renderer.id
+    renderer_activity_arn    = aws_sfn_activity.renderer.id
     project_name             = var.project_name
   })
 

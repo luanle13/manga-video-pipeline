@@ -16,7 +16,7 @@ terraform {
     # S3 bucket for state storage
     # Format: manga-pipeline-tfstate-{account_id}
     # Example: manga-pipeline-tfstate-123456789012
-    bucket = "manga-pipeline-tfstate-123456789012"
+    bucket = "manga-pipeline-tfstate-442075129398"
 
     # State file path within the bucket
     key = "prod/terraform.tfstate"
