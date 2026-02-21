@@ -1,14 +1,17 @@
 """Statistics and dashboard home routes."""
 
+import uuid
 from datetime import datetime, timedelta
 from typing import Any
 from zoneinfo import ZoneInfo
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+import boto3
+from fastapi import APIRouter, Depends, Form, HTTPException, Request, status
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 
+from src.common.config import get_settings
 from src.common.db import DynamoDBClient
 from src.common.logging_config import setup_logger
 from src.common.models import JobStatus
@@ -101,12 +104,16 @@ async def dashboard_home(
             quota_remaining=10,
         )
 
+    # Generate CSRF token for trigger button
+    csrf_token = request.app.state.csrf_manager.generate_token()
+
     return templates.TemplateResponse(
         "dashboard.html",
         {
             "request": request,
             "username": username,
             "stats": stats,
+            "csrf_token": csrf_token,
         },
     )
 
@@ -234,3 +241,83 @@ def calculate_stats(db_client: DynamoDBClient) -> DashboardStats:
         daily_quota=daily_quota,
         quota_remaining=quota_remaining,
     )
+
+
+@router.post("/api/trigger-pipeline")
+async def trigger_pipeline(
+    request: Request,
+    csrf_token: str = Form(...),
+    username: str = Depends(get_current_user),
+):
+    """
+    Manually trigger the video generation pipeline.
+
+    Starts a new Step Functions execution to process a manga video.
+
+    Args:
+        request: FastAPI request.
+        csrf_token: CSRF token from form.
+        username: Authenticated username.
+
+    Returns:
+        JSON with execution ARN and status.
+
+    Raises:
+        HTTPException: 403 if CSRF invalid, 500 if trigger fails.
+    """
+    # Verify CSRF token
+    if not request.app.state.csrf_manager.verify_token(csrf_token):
+        logger.warning(
+            "Pipeline trigger failed: invalid CSRF token",
+            extra={"username": username},
+        )
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Invalid CSRF token",
+        )
+
+    try:
+        settings = get_settings()
+
+        # Get state machine ARN from app state
+        state_machine_arn = request.app.state.state_machine_arn
+
+        # Create Step Functions client
+        sfn_client = boto3.client("stepfunctions", region_name=settings.aws_region)
+
+        # Generate unique execution name
+        execution_name = f"manual-{uuid.uuid4().hex[:8]}-{datetime.now().strftime('%Y%m%d-%H%M%S')}"
+
+        # Start execution with single_video_mode to process only one video
+        response = sfn_client.start_execution(
+            stateMachineArn=state_machine_arn,
+            name=execution_name,
+            input='{"single_video_mode": true}',
+        )
+
+        execution_arn = response["executionArn"]
+
+        logger.info(
+            "Pipeline triggered manually",
+            extra={
+                "username": username,
+                "execution_arn": execution_arn,
+                "execution_name": execution_name,
+            },
+        )
+
+        return {
+            "message": "Pipeline triggered successfully",
+            "execution_arn": execution_arn,
+            "execution_name": execution_name,
+        }
+
+    except Exception as e:
+        logger.error(
+            "Failed to trigger pipeline",
+            extra={"username": username, "error": str(e)},
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to trigger pipeline: {str(e)}",
+        )

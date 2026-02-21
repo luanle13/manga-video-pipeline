@@ -22,6 +22,7 @@ class Settings(BaseSettings):
     default_tone: str = "engaging and informative"
     default_daily_quota: int = 1
     daily_quota: int = 10
+    max_chapters: int = 10  # Limit chapters per video to avoid Lambda timeout
 
     model_config = {"env_prefix": "", "case_sensitive": False}
 

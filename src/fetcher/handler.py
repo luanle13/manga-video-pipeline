@@ -51,14 +51,14 @@ def handler(event: dict, context: Any) -> dict:
     job_record: JobRecord | None = None
 
     try:
-        # Step 1: Get trending manga
-        logger.info("Fetching trending manga")
-        trending_manga = mangadex_client.get_trending_manga(limit=20)
+        # Step 1: Get manga from multiple sources (trending, recently updated, popular)
+        logger.info("Fetching manga from multiple sources")
+        all_manga = mangadex_client.get_combined_manga_list(limit_per_source=15)
 
-        # Step 2: Find a suitable manga (not hentai, not already processed)
-        selected_manga_data: dict | None = None
+        # Step 2: Find a suitable manga (not hentai, not already processed, has chapters)
+        manga_info = None
 
-        for manga_data in trending_manga:
+        for manga_data in all_manga:
             manga_id = manga_data.get("id", "")
 
             # Check if hentai
@@ -77,38 +77,50 @@ def handler(event: dict, context: Any) -> dict:
                 )
                 continue
 
-            # This manga passes all filters
-            selected_manga_data = manga_data
+            # Fetch chapters to verify manga has content
+            logger.info("Checking chapters for manga", extra={"manga_id": manga_id})
+            chapters = mangadex_client.get_chapters(manga_id)
+
+            if not chapters:
+                logger.debug(
+                    "Skipping manga with no chapters",
+                    extra={"manga_id": manga_id},
+                )
+                continue
+
+            # This manga passes all filters and has chapters
             logger.info(
                 "Selected manga for processing",
-                extra={"manga_id": manga_id},
+                extra={"manga_id": manga_id, "chapter_count": len(chapters)},
             )
+
+            # Fetch full manga details
+            logger.info("Fetching manga details", extra={"manga_id": manga_id})
+            manga_info = mangadex_client.get_manga_details(manga_id)
+
+            # Limit chapters to avoid Lambda timeout
+            if len(chapters) > settings.max_chapters:
+                logger.info(
+                    "Limiting chapters",
+                    extra={
+                        "manga_id": manga_id,
+                        "total_chapters": len(chapters),
+                        "max_chapters": settings.max_chapters,
+                    },
+                )
+                chapters = chapters[: settings.max_chapters]
+
+            manga_info.chapters = chapters
             break
 
         # Step 3: If no manga available, return early
-        if selected_manga_data is None:
+        if manga_info is None:
             logger.info("No suitable manga available for processing")
             return {"status": "no_manga_available"}
 
-        manga_id = selected_manga_data.get("id", "")
+        manga_id = manga_info.manga_id
 
-        # Step 4: Fetch full manga details
-        logger.info("Fetching manga details", extra={"manga_id": manga_id})
-        manga_info = mangadex_client.get_manga_details(manga_id)
-
-        # Step 5: Fetch chapters
-        logger.info("Fetching chapters", extra={"manga_id": manga_id})
-        chapters = mangadex_client.get_chapters(manga_id)
-        manga_info.chapters = chapters
-
-        if not chapters:
-            logger.warning(
-                "No chapters found for manga",
-                extra={"manga_id": manga_id},
-            )
-            return {"status": "no_chapters_available", "manga_id": manga_id}
-
-        # Step 6: Create job record
+        # Step 4: Create job record
         job_id = str(uuid.uuid4())
         job_record = JobRecord(
             job_id=job_id,
@@ -123,10 +135,10 @@ def handler(event: dict, context: Any) -> dict:
             extra={"job_id": job_id, "manga_id": manga_id},
         )
 
-        # Step 7: Download panels
+        # Step 5: Download panels
         logger.info(
             "Starting panel download",
-            extra={"job_id": job_id, "chapter_count": len(chapters)},
+            extra={"job_id": job_id, "chapter_count": len(manga_info.chapters)},
         )
         panel_manifest = panel_downloader.download_manga_panels(manga_info, job_id)
 
@@ -141,18 +153,15 @@ def handler(event: dict, context: Any) -> dict:
             },
         )
 
-        # Step 8: Update job status to scripting
+        # Step 6: Update job status to scripting
         db_client.update_job_status(
             job_id=job_id,
             status=JobStatus.scripting,
             progress_pct=20,
         )
 
-        # Step 9: Mark manga as processed
-        db_client.mark_manga_processed(
-            manga_id=manga_id,
-            title=manga_info.title,
-        )
+        # Note: mark_manga_processed is now called in cleanup handler
+        # after successful pipeline completion, not here
 
         logger.info(
             "Fetcher handler completed successfully",
@@ -160,6 +169,7 @@ def handler(event: dict, context: Any) -> dict:
         )
 
         return {
+            "status": "success",
             "job_id": job_id,
             "manga_id": manga_id,
             "manga_title": manga_info.title,

@@ -72,6 +72,24 @@
             </select>
         </div>
 
+        <!-- Manual Review Mode -->
+        <div class="form-group">
+            <label for="manual_review_mode">
+                Manual Review Mode
+            </label>
+            <div style="display: flex; align-items: center; gap: 1rem;">
+                <input type="checkbox" id="manual_review_mode" name="manual_review_mode"
+                       {% if settings.manual_review_mode %}checked{% endif %}
+                       style="width: auto; height: 20px; cursor: pointer;">
+                <span id="review_mode_label" style="color: {% if settings.manual_review_mode %}#4caf50{% else %}#666{% endif %};">
+                    {% if settings.manual_review_mode %}Enabled{% else %}Disabled{% endif %}
+                </span>
+            </div>
+            <small style="color: #666; display: block; margin-top: 0.5rem;">
+                When enabled, videos will pause after rendering for manual review. You can download the video and choose when to upload to YouTube.
+            </small>
+        </div>
+
         <button type="submit" style="width: 100%;">Save Settings</button>
     </form>
 </div>
@@ -99,6 +117,12 @@
         <tr>
             <td><strong>Script Style:</strong></td>
             <td id="current-style">{{ settings.script_style }}</td>
+        </tr>
+        <tr>
+            <td><strong>Manual Review:</strong></td>
+            <td id="current-review-mode" style="color: {% if settings.manual_review_mode %}#4caf50{% else %}#666{% endif %};">
+                {% if settings.manual_review_mode %}Enabled{% else %}Disabled{% endif %}
+            </td>
         </tr>
     </table>
 </div>
@@ -160,6 +184,7 @@
                 voice_id: document.getElementById('voice_id').value,
                 tone: document.getElementById('tone').value,
                 script_style: document.getElementById('script_style').value,
+                manual_review_mode: document.getElementById('manual_review_mode').checked,
                 csrf_token: csrfToken
             };
 
@@ -187,6 +212,21 @@
 
                 document.getElementById('current-tone').textContent = formData.tone;
                 document.getElementById('current-style').textContent = formData.script_style;
+
+                // Update manual review mode display
+                const reviewModeEl = document.getElementById('current-review-mode');
+                const reviewLabelEl = document.getElementById('review_mode_label');
+                if (formData.manual_review_mode) {
+                    reviewModeEl.textContent = 'Enabled';
+                    reviewModeEl.style.color = '#4caf50';
+                    reviewLabelEl.textContent = 'Enabled';
+                    reviewLabelEl.style.color = '#4caf50';
+                } else {
+                    reviewModeEl.textContent = 'Disabled';
+                    reviewModeEl.style.color = '#666';
+                    reviewLabelEl.textContent = 'Disabled';
+                    reviewLabelEl.style.color = '#666';
+                }
             } else {
                 showToast(data.detail || 'Failed to save settings', 'error');
             }
@@ -199,10 +239,24 @@
         }
     }
 
+    // Update review mode label on change
+    function updateReviewModeLabel() {
+        const checkbox = document.getElementById('manual_review_mode');
+        const label = document.getElementById('review_mode_label');
+        if (checkbox.checked) {
+            label.textContent = 'Enabled';
+            label.style.color = '#4caf50';
+        } else {
+            label.textContent = 'Disabled';
+            label.style.color = '#666';
+        }
+    }
+
     // Initialize
     document.addEventListener('DOMContentLoaded', () => {
         loadVoices();
         document.getElementById('settingsForm').addEventListener('submit', saveSettings);
+        document.getElementById('manual_review_mode').addEventListener('change', updateReviewModeLabel);
     });
 </script>
 {% endblock %}

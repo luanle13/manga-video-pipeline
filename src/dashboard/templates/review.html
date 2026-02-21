@@ -1,0 +1,454 @@
+{% extends "base.html" %}
+
+{% block title %}Create Review Video - Manga Video Pipeline Admin{% endblock %}
+
+{% block extra_css %}
+<style>
+    .review-form {
+        max-width: 600px;
+    }
+
+    .input-tabs {
+        display: flex;
+        gap: 0;
+        margin-bottom: 1.5rem;
+        border-bottom: 1px solid var(--border);
+    }
+
+    .input-tab {
+        padding: 0.75rem 1.5rem;
+        background: transparent;
+        border: none;
+        border-bottom: 2px solid transparent;
+        color: var(--text-secondary);
+        cursor: pointer;
+        font-size: 1rem;
+        transition: all 0.3s;
+    }
+
+    .input-tab:hover {
+        color: var(--text-primary);
+    }
+
+    .input-tab.active {
+        color: var(--accent);
+        border-bottom-color: var(--accent);
+    }
+
+    .tab-content {
+        display: none;
+    }
+
+    .tab-content.active {
+        display: block;
+    }
+
+    .url-validation {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        margin-top: 0.5rem;
+        font-size: 0.85rem;
+    }
+
+    .url-validation.valid {
+        color: var(--success);
+    }
+
+    .url-validation.invalid {
+        color: var(--danger);
+    }
+
+    .search-results {
+        margin-top: 1.5rem;
+    }
+
+    .search-result {
+        display: flex;
+        gap: 1rem;
+        padding: 1rem;
+        background-color: var(--bg-tertiary);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        margin-bottom: 0.75rem;
+        cursor: pointer;
+        transition: border-color 0.3s;
+    }
+
+    .search-result:hover {
+        border-color: var(--accent);
+    }
+
+    .search-result.selected {
+        border-color: var(--accent);
+        background-color: rgba(74, 144, 226, 0.1);
+    }
+
+    .search-result img {
+        width: 60px;
+        height: 80px;
+        object-fit: cover;
+        border-radius: 4px;
+    }
+
+    .search-result-info {
+        flex: 1;
+    }
+
+    .search-result-title {
+        font-weight: 600;
+        margin-bottom: 0.25rem;
+    }
+
+    .search-result-meta {
+        font-size: 0.85rem;
+        color: var(--text-secondary);
+    }
+
+    .search-result-source {
+        display: inline-block;
+        padding: 0.15rem 0.5rem;
+        background-color: var(--accent);
+        border-radius: 4px;
+        font-size: 0.75rem;
+        margin-left: 0.5rem;
+    }
+
+    .loading {
+        display: none;
+        align-items: center;
+        gap: 0.5rem;
+        color: var(--text-secondary);
+    }
+
+    .loading.active {
+        display: flex;
+    }
+
+    .spinner {
+        width: 20px;
+        height: 20px;
+        border: 2px solid var(--border);
+        border-top-color: var(--accent);
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin {
+        to { transform: rotate(360deg); }
+    }
+
+    .submit-section {
+        margin-top: 2rem;
+        padding-top: 1.5rem;
+        border-top: 1px solid var(--border);
+    }
+
+    .submit-section button {
+        width: 100%;
+    }
+
+    .help-text {
+        font-size: 0.85rem;
+        color: var(--text-secondary);
+        margin-top: 0.5rem;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<h1>Create Review Video</h1>
+<p class="mb-2" style="color: var(--text-secondary);">
+    Generate a comprehensive manga review video with Vietnamese narration.
+</p>
+
+<div class="card review-form">
+    <form id="reviewForm" method="POST" action="/api/review/create">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+
+        <!-- Input Method Tabs -->
+        <div class="input-tabs">
+            <button type="button" class="input-tab active" data-tab="url">Enter URL</button>
+            <button type="button" class="input-tab" data-tab="search">Search by Name</button>
+        </div>
+
+        <!-- URL Input Tab -->
+        <div id="urlTab" class="tab-content active">
+            <div class="form-group">
+                <label for="mangaUrl">Manga URL</label>
+                <input
+                    type="url"
+                    id="mangaUrl"
+                    name="manga_url"
+                    placeholder="https://truyenqqno.com/truyen-tranh/..."
+                >
+                <div id="urlValidation" class="url-validation"></div>
+                <p class="help-text">
+                    Supported sites: TruyenQQ, NetTruyen, TruyenTranhLH
+                </p>
+            </div>
+        </div>
+
+        <!-- Search Tab -->
+        <div id="searchTab" class="tab-content">
+            <div class="form-group">
+                <label for="mangaName">Manga Name</label>
+                <input
+                    type="text"
+                    id="mangaName"
+                    name="manga_name"
+                    placeholder="Enter manga title in Vietnamese or original..."
+                >
+            </div>
+
+            <div class="form-group">
+                <label for="source">Source (Optional)</label>
+                <select id="source" name="source">
+                    <option value="">Auto-detect</option>
+                    {% for src in sources %}
+                    <option value="{{ src.value }}">{{ src.label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <button type="button" id="searchBtn" class="btn">
+                Search
+            </button>
+
+            <div id="searchLoading" class="loading mt-1">
+                <div class="spinner"></div>
+                <span>Searching...</span>
+            </div>
+
+            <div id="searchResults" class="search-results"></div>
+
+            <!-- Hidden input to store selected URL from search -->
+            <input type="hidden" id="selectedUrl" name="selected_url">
+        </div>
+
+        <!-- Submit Section -->
+        <div class="submit-section">
+            <button type="submit" id="submitBtn" disabled>
+                Create Review Video
+            </button>
+        </div>
+    </form>
+</div>
+
+<div class="card">
+    <h2>How it works</h2>
+    <ol style="padding-left: 1.5rem; color: var(--text-secondary);">
+        <li>Enter a manga URL or search by name</li>
+        <li>System fetches all chapters and extracts content</li>
+        <li>AI generates Vietnamese review script</li>
+        <li>Text-to-speech creates audio narration</li>
+        <li>Video is rendered with cover and key panels</li>
+        <li>Uploaded to YouTube (or paused for review)</li>
+    </ol>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Tab switching
+    document.querySelectorAll('.input-tab').forEach(tab => {
+        tab.addEventListener('click', () => {
+            // Update tabs
+            document.querySelectorAll('.input-tab').forEach(t => t.classList.remove('active'));
+            tab.classList.add('active');
+
+            // Update content
+            document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+            const tabId = tab.dataset.tab + 'Tab';
+            document.getElementById(tabId).classList.add('active');
+
+            // Clear inputs and validation
+            updateSubmitButton();
+        });
+    });
+
+    // URL validation
+    let validationTimeout;
+    const mangaUrlInput = document.getElementById('mangaUrl');
+    const urlValidation = document.getElementById('urlValidation');
+
+    mangaUrlInput.addEventListener('input', () => {
+        clearTimeout(validationTimeout);
+        const url = mangaUrlInput.value.trim();
+
+        if (!url) {
+            urlValidation.innerHTML = '';
+            urlValidation.className = 'url-validation';
+            updateSubmitButton();
+            return;
+        }
+
+        validationTimeout = setTimeout(async () => {
+            try {
+                const formData = new FormData();
+                formData.append('url', url);
+
+                const response = await fetch('/api/review/validate-url', {
+                    method: 'POST',
+                    body: formData,
+                    credentials: 'include'
+                });
+
+                const result = await response.json();
+
+                if (result.valid) {
+                    urlValidation.innerHTML = `✓ Valid URL (${result.source})`;
+                    urlValidation.className = 'url-validation valid';
+                } else {
+                    urlValidation.innerHTML = '✗ Unsupported URL';
+                    urlValidation.className = 'url-validation invalid';
+                }
+            } catch (error) {
+                urlValidation.innerHTML = '✗ Validation failed';
+                urlValidation.className = 'url-validation invalid';
+            }
+
+            updateSubmitButton();
+        }, 500);
+    });
+
+    // Search functionality
+    const searchBtn = document.getElementById('searchBtn');
+    const searchLoading = document.getElementById('searchLoading');
+    const searchResults = document.getElementById('searchResults');
+    const mangaNameInput = document.getElementById('mangaName');
+    const sourceSelect = document.getElementById('source');
+    let selectedResult = null;
+
+    searchBtn.addEventListener('click', async () => {
+        const query = mangaNameInput.value.trim();
+        if (!query) {
+            showToast('Please enter a manga name', 'error');
+            return;
+        }
+
+        searchLoading.classList.add('active');
+        searchResults.innerHTML = '';
+        selectedResult = null;
+        updateSubmitButton();
+
+        try {
+            const response = await fetch('/api/review/search', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    query: query,
+                    source: sourceSelect.value || null
+                }),
+                credentials: 'include'
+            });
+
+            if (!response.ok) {
+                throw new Error('Search failed');
+            }
+
+            const results = await response.json();
+
+            if (results.length === 0) {
+                searchResults.innerHTML = '<p style="color: var(--text-secondary);">No results found</p>';
+            } else {
+                searchResults.innerHTML = results.map(r => `
+                    <div class="search-result" data-url="${r.url}">
+                        <img src="${r.cover_url || '/static/placeholder.png'}" alt="${r.title}" onerror="this.src='/static/placeholder.png'">
+                        <div class="search-result-info">
+                            <div class="search-result-title">${r.title}</div>
+                            <div class="search-result-meta">
+                                ${r.chapter_count ? r.chapter_count + ' chapters' : ''}
+                                <span class="search-result-source">${r.source}</span>
+                            </div>
+                        </div>
+                    </div>
+                `).join('');
+
+                // Add click handlers
+                document.querySelectorAll('.search-result').forEach(el => {
+                    el.addEventListener('click', () => {
+                        document.querySelectorAll('.search-result').forEach(r => r.classList.remove('selected'));
+                        el.classList.add('selected');
+                        selectedResult = el.dataset.url;
+                        document.getElementById('selectedUrl').value = selectedResult;
+                        updateSubmitButton();
+                    });
+                });
+            }
+
+        } catch (error) {
+            searchResults.innerHTML = '<p style="color: var(--danger);">Search failed. Please try again.</p>';
+        } finally {
+            searchLoading.classList.remove('active');
+        }
+    });
+
+    // Submit button state
+    function updateSubmitButton() {
+        const submitBtn = document.getElementById('submitBtn');
+        const activeTab = document.querySelector('.input-tab.active').dataset.tab;
+
+        if (activeTab === 'url') {
+            const isValid = urlValidation.classList.contains('valid');
+            submitBtn.disabled = !isValid;
+        } else {
+            submitBtn.disabled = !selectedResult;
+        }
+    }
+
+    // Form submission
+    document.getElementById('reviewForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+
+        const submitBtn = document.getElementById('submitBtn');
+        const originalText = submitBtn.textContent;
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Creating...';
+
+        try {
+            const formData = new FormData(e.target);
+            const activeTab = document.querySelector('.input-tab.active').dataset.tab;
+
+            // If search tab is active and result selected, use that URL
+            if (activeTab === 'search' && selectedResult) {
+                formData.set('manga_url', selectedResult);
+                formData.delete('manga_name');
+            }
+
+            const response = await fetch('/api/review/create', {
+                method: 'POST',
+                body: formData,
+                credentials: 'include'
+            });
+
+            const result = await response.json();
+
+            if (response.ok) {
+                showToast('Review job created successfully!');
+                // Redirect to queue
+                setTimeout(() => {
+                    window.location.href = '/queue';
+                }, 1500);
+            } else {
+                throw new Error(result.detail || 'Failed to create review job');
+            }
+
+        } catch (error) {
+            showToast(error.message, 'error');
+            submitBtn.disabled = false;
+            submitBtn.textContent = originalText;
+        }
+    });
+
+    // Enter key to search
+    mangaNameInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            searchBtn.click();
+        }
+    });
+</script>
+{% endblock %}

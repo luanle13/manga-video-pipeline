@@ -156,6 +156,7 @@
         .badge.completed { background-color: var(--success); color: white; }
         .badge.failed { background-color: var(--danger); color: white; }
         .badge.pending { background-color: #666; color: white; }
+        .badge.awaiting_review { background-color: #9c27b0; color: white; }
         .badge.fetching, .badge.scripting, .badge.tts, .badge.rendering, .badge.uploading {
             background-color: var(--warning);
             color: white;
@@ -188,6 +189,14 @@
 
         .btn-danger:hover {
             background-color: #d32f2f;
+        }
+
+        .btn-success {
+            background-color: var(--success);
+        }
+
+        .btn-success:hover {
+            background-color: #388e3c;
         }
 
         .btn-sm {
@@ -289,6 +298,7 @@
         <ul>
             <li><a href="/" {% if request.path == '/' %}class="active"{% endif %}>Dashboard</a></li>
             <li><a href="/queue" {% if request.path == '/queue' %}class="active"{% endif %}>Queue</a></li>
+            <li><a href="/review" {% if request.path == '/review' %}class="active"{% endif %}>Review</a></li>
             <li><a href="/settings" {% if request.path == '/settings' %}class="active"{% endif %}>Settings</a></li>
             <li><a href="/manga" {% if request.path == '/manga' %}class="active"{% endif %}>Processed Manga</a></li>
             <li><a href="#" onclick="logout(event)">Logout</a></li>

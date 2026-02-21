@@ -121,55 +121,65 @@ output "quota_checker_log_group_arn" {
 output "lambda_function_arns" {
   description = "Map of all Lambda function ARNs"
   value = {
-    manga_fetcher    = aws_lambda_function.manga_fetcher.arn
-    script_generator = aws_lambda_function.script_generator.arn
-    tts_processor    = aws_lambda_function.tts_processor.arn
-    cleanup          = aws_lambda_function.cleanup.arn
-    quota_checker    = aws_lambda_function.quota_checker.arn
+    manga_fetcher     = aws_lambda_function.manga_fetcher.arn
+    script_generator  = aws_lambda_function.script_generator.arn
+    tts_processor     = aws_lambda_function.tts_processor.arn
+    cleanup           = aws_lambda_function.cleanup.arn
+    quota_checker     = aws_lambda_function.quota_checker.arn
+    review_fetcher    = aws_lambda_function.review_fetcher.arn
+    review_scriptgen  = aws_lambda_function.review_scriptgen.arn
   }
 }
 
 output "lambda_function_names" {
   description = "Map of all Lambda function names"
   value = {
-    manga_fetcher    = aws_lambda_function.manga_fetcher.function_name
-    script_generator = aws_lambda_function.script_generator.function_name
-    tts_processor    = aws_lambda_function.tts_processor.function_name
-    cleanup          = aws_lambda_function.cleanup.function_name
-    quota_checker    = aws_lambda_function.quota_checker.function_name
+    manga_fetcher     = aws_lambda_function.manga_fetcher.function_name
+    script_generator  = aws_lambda_function.script_generator.function_name
+    tts_processor     = aws_lambda_function.tts_processor.function_name
+    cleanup           = aws_lambda_function.cleanup.function_name
+    quota_checker     = aws_lambda_function.quota_checker.function_name
+    review_fetcher    = aws_lambda_function.review_fetcher.function_name
+    review_scriptgen  = aws_lambda_function.review_scriptgen.function_name
   }
 }
 
 output "lambda_invoke_arns" {
   description = "Map of all Lambda invoke ARNs (for Step Functions)"
   value = {
-    manga_fetcher    = aws_lambda_function.manga_fetcher.invoke_arn
-    script_generator = aws_lambda_function.script_generator.invoke_arn
-    tts_processor    = aws_lambda_function.tts_processor.invoke_arn
-    cleanup          = aws_lambda_function.cleanup.invoke_arn
-    quota_checker    = aws_lambda_function.quota_checker.invoke_arn
+    manga_fetcher     = aws_lambda_function.manga_fetcher.invoke_arn
+    script_generator  = aws_lambda_function.script_generator.invoke_arn
+    tts_processor     = aws_lambda_function.tts_processor.invoke_arn
+    cleanup           = aws_lambda_function.cleanup.invoke_arn
+    quota_checker     = aws_lambda_function.quota_checker.invoke_arn
+    review_fetcher    = aws_lambda_function.review_fetcher.invoke_arn
+    review_scriptgen  = aws_lambda_function.review_scriptgen.invoke_arn
   }
 }
 
 output "log_group_arns" {
   description = "Map of all CloudWatch log group ARNs"
   value = {
-    manga_fetcher    = aws_cloudwatch_log_group.manga_fetcher.arn
-    script_generator = aws_cloudwatch_log_group.script_generator.arn
-    tts_processor    = aws_cloudwatch_log_group.tts_processor.arn
-    cleanup          = aws_cloudwatch_log_group.cleanup.arn
-    quota_checker    = aws_cloudwatch_log_group.quota_checker.arn
+    manga_fetcher     = aws_cloudwatch_log_group.manga_fetcher.arn
+    script_generator  = aws_cloudwatch_log_group.script_generator.arn
+    tts_processor     = aws_cloudwatch_log_group.tts_processor.arn
+    cleanup           = aws_cloudwatch_log_group.cleanup.arn
+    quota_checker     = aws_cloudwatch_log_group.quota_checker.arn
+    review_fetcher    = aws_cloudwatch_log_group.review_fetcher.arn
+    review_scriptgen  = aws_cloudwatch_log_group.review_scriptgen.arn
   }
 }
 
 output "log_group_names" {
   description = "Map of all CloudWatch log group names"
   value = {
-    manga_fetcher    = aws_cloudwatch_log_group.manga_fetcher.name
-    script_generator = aws_cloudwatch_log_group.script_generator.name
-    tts_processor    = aws_cloudwatch_log_group.tts_processor.name
-    cleanup          = aws_cloudwatch_log_group.cleanup.name
-    quota_checker    = aws_cloudwatch_log_group.quota_checker.name
+    manga_fetcher     = aws_cloudwatch_log_group.manga_fetcher.name
+    script_generator  = aws_cloudwatch_log_group.script_generator.name
+    tts_processor     = aws_cloudwatch_log_group.tts_processor.name
+    cleanup           = aws_cloudwatch_log_group.cleanup.name
+    quota_checker     = aws_cloudwatch_log_group.quota_checker.name
+    review_fetcher    = aws_cloudwatch_log_group.review_fetcher.name
+    review_scriptgen  = aws_cloudwatch_log_group.review_scriptgen.name
   }
 }
 
@@ -282,6 +292,30 @@ output "step_functions_log_group_name" {
 output "step_functions_log_group_arn" {
   description = "ARN of the Step Functions CloudWatch log group"
   value       = aws_cloudwatch_log_group.step_functions.arn
+}
+
+# =============================================================================
+# Review Pipeline Step Functions Outputs
+# =============================================================================
+
+output "review_state_machine_arn" {
+  description = "ARN of the Review Step Functions state machine"
+  value       = aws_sfn_state_machine.review_pipeline.arn
+}
+
+output "review_state_machine_name" {
+  description = "Name of the Review Step Functions state machine"
+  value       = aws_sfn_state_machine.review_pipeline.name
+}
+
+output "review_step_functions_log_group_name" {
+  description = "Name of the Review Step Functions CloudWatch log group"
+  value       = aws_cloudwatch_log_group.review_step_functions.name
+}
+
+output "review_step_functions_log_group_arn" {
+  description = "ARN of the Review Step Functions CloudWatch log group"
+  value       = aws_cloudwatch_log_group.review_step_functions.arn
 }
 
 # =============================================================================

@@ -455,7 +455,195 @@ resource "aws_iam_role_policy" "lambda_quota_checker" {
 }
 
 # =============================================================================
-# 6. EC2 Renderer Role (Spot Instances)
+# 6. Lambda Review Fetcher Role
+# =============================================================================
+# Purpose: Scrape Vietnamese manga sites and extract chapter content
+# Permissions: S3 (PutObject, GetObject), DynamoDB (GetItem, PutItem, UpdateItem),
+#              Secrets Manager (GetSecretValue), CloudWatch Logs
+# =============================================================================
+
+resource "aws_iam_role" "lambda_review_fetcher" {
+  name        = "${var.project_name}-lambda-review-fetcher"
+  description = "IAM role for review fetcher Lambda function"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Principal = {
+          Service = "lambda.amazonaws.com"
+        }
+        Action = "sts:AssumeRole"
+      }
+    ]
+  })
+
+  tags = merge(
+    local.common_tags,
+    {
+      Name      = "${var.project_name}-lambda-review-fetcher"
+      Component = "lambda"
+      Function  = "review-fetcher"
+      Pipeline  = "review"
+    }
+  )
+}
+
+resource "aws_iam_role_policy" "lambda_review_fetcher" {
+  name = "${var.project_name}-lambda-review-fetcher-policy"
+  role = aws_iam_role.lambda_review_fetcher.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      # S3 permissions for storing scraped content and images
+      {
+        Sid    = "S3AssetsBucketAccess"
+        Effect = "Allow"
+        Action = [
+          "s3:PutObject",
+          "s3:GetObject"
+        ]
+        Resource = "${var.s3_assets_bucket_arn}/jobs/*"
+      },
+      # DynamoDB permissions for job tracking
+      {
+        Sid    = "DynamoDBJobsAccess"
+        Effect = "Allow"
+        Action = [
+          "dynamodb:GetItem",
+          "dynamodb:PutItem",
+          "dynamodb:UpdateItem",
+          "dynamodb:Query"
+        ]
+        Resource = [
+          var.dynamodb_jobs_table_arn,
+          "${var.dynamodb_jobs_table_arn}/index/${var.dynamodb_jobs_gsi_name}"
+        ]
+      },
+      # DynamoDB permissions for reading settings
+      {
+        Sid    = "DynamoDBSettingsAccess"
+        Effect = "Allow"
+        Action = [
+          "dynamodb:GetItem"
+        ]
+        Resource = var.dynamodb_settings_table_arn
+      },
+      # CloudWatch Logs
+      {
+        Sid    = "CloudWatchLogsAccess"
+        Effect = "Allow"
+        Action = [
+          "logs:CreateLogGroup",
+          "logs:CreateLogStream",
+          "logs:PutLogEvents"
+        ]
+        Resource = "arn:aws:logs:${local.region}:${local.account_id}:log-group:/aws/lambda/${var.project_name}-review-fetcher*"
+      }
+    ]
+  })
+}
+
+# =============================================================================
+# 7. Lambda Review Script Generator Role
+# =============================================================================
+# Purpose: Generate Vietnamese review scripts from chapter summaries using LLM
+# Permissions: S3 (GetObject, PutObject), DynamoDB (GetItem, UpdateItem),
+#              Secrets Manager (GetSecretValue), CloudWatch Logs
+# =============================================================================
+
+resource "aws_iam_role" "lambda_review_scriptgen" {
+  name        = "${var.project_name}-lambda-review-scriptgen"
+  description = "IAM role for review script generator Lambda function"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Principal = {
+          Service = "lambda.amazonaws.com"
+        }
+        Action = "sts:AssumeRole"
+      }
+    ]
+  })
+
+  tags = merge(
+    local.common_tags,
+    {
+      Name      = "${var.project_name}-lambda-review-scriptgen"
+      Component = "lambda"
+      Function  = "review-scriptgen"
+      Pipeline  = "review"
+    }
+  )
+}
+
+resource "aws_iam_role_policy" "lambda_review_scriptgen" {
+  name = "${var.project_name}-lambda-review-scriptgen-policy"
+  role = aws_iam_role.lambda_review_scriptgen.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      # S3 permissions for reading review manifest and writing scripts
+      {
+        Sid    = "S3AssetsBucketAccess"
+        Effect = "Allow"
+        Action = [
+          "s3:GetObject",
+          "s3:PutObject"
+        ]
+        Resource = "${var.s3_assets_bucket_arn}/jobs/*"
+      },
+      # DynamoDB permissions for job updates
+      {
+        Sid    = "DynamoDBJobsAccess"
+        Effect = "Allow"
+        Action = [
+          "dynamodb:GetItem",
+          "dynamodb:UpdateItem"
+        ]
+        Resource = var.dynamodb_jobs_table_arn
+      },
+      # DynamoDB permissions for reading settings
+      {
+        Sid    = "DynamoDBSettingsAccess"
+        Effect = "Allow"
+        Action = [
+          "dynamodb:GetItem"
+        ]
+        Resource = var.dynamodb_settings_table_arn
+      },
+      # Secrets Manager for DeepInfra API key
+      {
+        Sid    = "SecretsManagerDeepInfraAccess"
+        Effect = "Allow"
+        Action = [
+          "secretsmanager:GetSecretValue"
+        ]
+        Resource = "arn:aws:secretsmanager:${local.region}:${local.account_id}:secret:${var.deepinfra_api_key_secret_name}*"
+      },
+      # CloudWatch Logs
+      {
+        Sid    = "CloudWatchLogsAccess"
+        Effect = "Allow"
+        Action = [
+          "logs:CreateLogGroup",
+          "logs:CreateLogStream",
+          "logs:PutLogEvents"
+        ]
+        Resource = "arn:aws:logs:${local.region}:${local.account_id}:log-group:/aws/lambda/${var.project_name}-review-scriptgen*"
+      }
+    ]
+  })
+}
+
+# =============================================================================
+# 8. EC2 Renderer Role (Spot Instances)
 # =============================================================================
 # Purpose: Render videos, merge audio, upload to YouTube from Spot instances
 # Permissions: S3 (GetObject, PutObject), DynamoDB (GetItem, UpdateItem),
@@ -520,6 +708,15 @@ resource "aws_iam_role_policy" "ec2_renderer" {
         ]
         Resource = "${var.s3_assets_bucket_arn}/jobs/*"
       },
+      # S3 permissions for downloading renderer deployment code
+      {
+        Sid    = "S3DeploymentsBucketAccess"
+        Effect = "Allow"
+        Action = [
+          "s3:GetObject"
+        ]
+        Resource = "${var.s3_assets_bucket_arn}/deployments/*"
+      },
       # DynamoDB permissions for job updates
       {
         Sid    = "DynamoDBJobsAccess"
@@ -529,6 +726,15 @@ resource "aws_iam_role_policy" "ec2_renderer" {
           "dynamodb:UpdateItem"
         ]
         Resource = var.dynamodb_jobs_table_arn
+      },
+      # DynamoDB permissions for reading settings (manual_review_mode)
+      {
+        Sid    = "DynamoDBSettingsAccess"
+        Effect = "Allow"
+        Action = [
+          "dynamodb:GetItem"
+        ]
+        Resource = var.dynamodb_settings_table_arn
       },
       # Secrets Manager for YouTube credentials
       {
@@ -577,9 +783,24 @@ resource "aws_iam_role_policy" "ec2_renderer" {
         Effect = "Allow"
         Action = [
           "ssm:GetParameter",
-          "ssm:GetParameters"
+          "ssm:GetParameters",
+          "ssm:PutParameter"
         ]
         Resource = "arn:aws:ssm:${local.region}:${local.account_id}:parameter/${var.project_name}/*"
+      },
+      # EC2 permissions for self-termination
+      {
+        Sid    = "EC2SelfTerminateAccess"
+        Effect = "Allow"
+        Action = [
+          "ec2:TerminateInstances"
+        ]
+        Resource = "*"
+        Condition = {
+          StringEquals = {
+            "ec2:ResourceTag/Component" = "renderer"
+          }
+        }
       }
     ]
   })
@@ -638,7 +859,9 @@ resource "aws_iam_role_policy" "step_functions" {
           "arn:aws:lambda:${local.region}:${local.account_id}:function:${var.lambda_function_names.script_generator}",
           "arn:aws:lambda:${local.region}:${local.account_id}:function:${var.lambda_function_names.tts_processor}",
           "arn:aws:lambda:${local.region}:${local.account_id}:function:${var.lambda_function_names.quota_checker}",
-          "arn:aws:lambda:${local.region}:${local.account_id}:function:${var.lambda_function_names.cleanup}"
+          "arn:aws:lambda:${local.region}:${local.account_id}:function:${var.lambda_function_names.cleanup}",
+          "arn:aws:lambda:${local.region}:${local.account_id}:function:${var.project_name}-review-fetcher",
+          "arn:aws:lambda:${local.region}:${local.account_id}:function:${var.project_name}-review-scriptgen"
         ]
       },
       # EC2 permissions for Spot instance management - RunInstances
@@ -732,6 +955,20 @@ resource "aws_iam_role_policy" "step_functions" {
           }
         }
       },
+      # IAM CreateServiceLinkedRole for EC2 Spot (one-time creation)
+      {
+        Sid    = "IAMCreateServiceLinkedRoleAccess"
+        Effect = "Allow"
+        Action = [
+          "iam:CreateServiceLinkedRole"
+        ]
+        Resource = "arn:aws:iam::*:role/aws-service-role/spot.amazonaws.com/AWSServiceRoleForEC2Spot"
+        Condition = {
+          StringLike = {
+            "iam:AWSServiceName" = "spot.amazonaws.com"
+          }
+        }
+      },
       # CloudWatch Logs
       {
         Sid    = "CloudWatchLogsAccess"
@@ -747,6 +984,37 @@ resource "aws_iam_role_policy" "step_functions" {
           "logs:DescribeLogGroups"
         ]
         Resource = "*"
+      },
+      # DynamoDB access for updating job status
+      {
+        Sid    = "DynamoDBAccess"
+        Effect = "Allow"
+        Action = [
+          "dynamodb:UpdateItem"
+        ]
+        Resource = "arn:aws:dynamodb:${local.region}:${local.account_id}:table/${var.project_name}-jobs"
+      },
+      # SSM Parameter Store access for renderer job coordination
+      {
+        Sid    = "SSMParameterAccess"
+        Effect = "Allow"
+        Action = [
+          "ssm:PutParameter",
+          "ssm:GetParameter"
+        ]
+        Resource = "arn:aws:ssm:${local.region}:${local.account_id}:parameter/${var.project_name}/*"
+      },
+      # Step Functions Activity access
+      {
+        Sid    = "StatesActivityAccess"
+        Effect = "Allow"
+        Action = [
+          "states:GetActivityTask",
+          "states:SendTaskSuccess",
+          "states:SendTaskFailure",
+          "states:SendTaskHeartbeat"
+        ]
+        Resource = "arn:aws:states:${local.region}:${local.account_id}:activity:${var.project_name}-*"
       }
     ]
   })
@@ -945,7 +1213,7 @@ resource "aws_iam_role_policy" "dashboard_ec2" {
         ]
         Resource = "*"
       },
-      # S3 access for downloading deployment packages
+      # S3 access for downloading deployment packages from assets bucket
       {
         Sid    = "S3DeploymentBucketReadAccess"
         Effect = "Allow"
@@ -954,9 +1222,19 @@ resource "aws_iam_role_policy" "dashboard_ec2" {
           "s3:ListBucket"
         ]
         Resource = [
-          "arn:aws:s3:::${var.project_name}-deployments-${local.account_id}",
-          "arn:aws:s3:::${var.project_name}-deployments-${local.account_id}/*"
+          var.s3_assets_bucket_arn,
+          "${var.s3_assets_bucket_arn}/deployments/*"
         ]
+      },
+      # S3 access for reading job artifacts (video downloads, presigned URLs)
+      {
+        Sid    = "S3JobsReadAccess"
+        Effect = "Allow"
+        Action = [
+          "s3:GetObject",
+          "s3:HeadObject"
+        ]
+        Resource = "${var.s3_assets_bucket_arn}/jobs/*"
       }
     ]
   })

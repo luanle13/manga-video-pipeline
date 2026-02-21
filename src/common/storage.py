@@ -306,3 +306,21 @@ class S3Client:
             extra={"s3_key": s3_key, "expires_in": expires_in, "operation": "get_presigned_url"},
         )
         return url
+
+    def file_exists(self, s3_key: str) -> bool:
+        """
+        Check if a file exists in S3.
+
+        Args:
+            s3_key: S3 object key.
+
+        Returns:
+            True if file exists, False otherwise.
+        """
+        try:
+            self._client.head_object(Bucket=self._bucket, Key=s3_key)
+            return True
+        except self._client.exceptions.ClientError as e:
+            if e.response["Error"]["Code"] == "404":
+                return False
+            raise

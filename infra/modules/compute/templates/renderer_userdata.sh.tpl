@@ -17,6 +17,7 @@ REGION="${region}"
 PROJECT_NAME="${project_name}"
 S3_BUCKET="${s3_bucket}"
 DYNAMODB_JOBS_TABLE="${dynamodb_jobs_table}"
+DYNAMODB_SETTINGS_TABLE="${dynamodb_settings_table}"
 YOUTUBE_SECRET_NAME="${youtube_secret_name}"
 CLEANUP_FUNCTION_NAME="${cleanup_function_name}"
 LOG_LEVEL="${log_level}"
@@ -27,7 +28,10 @@ JOB_ID_PARAM="/$PROJECT_NAME/renderer/current-job-id"
 
 # Logging setup
 LOG_GROUP="/aws/ec2/$PROJECT_NAME-renderer"
-INSTANCE_ID=$(curl -s http://169.254.169.254/latest/meta-data/instance-id)
+
+# Get instance ID using IMDSv2 (required for this instance)
+IMDS_TOKEN=$(curl -s -X PUT "http://169.254.169.254/latest/api/token" -H "X-aws-ec2-metadata-token-ttl-seconds: 21600")
+INSTANCE_ID=$(curl -s -H "X-aws-ec2-metadata-token: $IMDS_TOKEN" http://169.254.169.254/latest/meta-data/instance-id)
 LOG_STREAM="$INSTANCE_ID/$(date +%Y-%m-%d)"
 
 log() {
@@ -60,22 +64,36 @@ dnf update -y
 # Install Python 3.12 and development tools
 dnf install -y python3.12 python3.12-pip python3.12-devel
 
-# Install FFmpeg
-dnf install -y ffmpeg ffmpeg-devel
-
 # Install additional dependencies for video processing
 dnf install -y \
     gcc \
     gcc-c++ \
     make \
     git \
-    jq
+    jq \
+    tar \
+    xz
 
-# Set Python 3.12 as default
-alternatives --set python3 /usr/bin/python3.12
+# Install FFmpeg from static build (not available in AL2023 repos)
+log "Installing FFmpeg from static build..."
+cd /tmp
+curl -L -o ffmpeg-release-amd64-static.tar.xz https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-amd64-static.tar.xz
+tar -xf ffmpeg-release-amd64-static.tar.xz
+cp ffmpeg-*-amd64-static/ffmpeg /usr/local/bin/
+cp ffmpeg-*-amd64-static/ffprobe /usr/local/bin/
+chmod +x /usr/local/bin/ffmpeg /usr/local/bin/ffprobe
+rm -rf ffmpeg-*
+cd -
+
+# Verify ffmpeg installation
+ffmpeg -version
+
+# Set Python 3.12 as default (use symlink since alternatives may not be set up)
+ln -sf /usr/bin/python3.12 /usr/local/bin/python3
+export PATH="/usr/local/bin:$PATH"
 
 # Upgrade pip
-python3 -m pip install --upgrade pip
+python3.12 -m pip install --upgrade pip
 
 log "System dependencies installed"
 
@@ -142,7 +160,7 @@ tar -xzf renderer.tar.gz
 rm renderer.tar.gz
 
 # Install Python dependencies
-python3 -m pip install -r requirements.txt
+python3.12 -m pip install -r requirements.txt
 
 log "Application code ready"
 
@@ -186,6 +204,7 @@ log "Starting video rendering..."
 export AWS_DEFAULT_REGION="$REGION"
 export S3_BUCKET="$S3_BUCKET"
 export DYNAMODB_JOBS_TABLE="$DYNAMODB_JOBS_TABLE"
+export DYNAMODB_SETTINGS_TABLE="$DYNAMODB_SETTINGS_TABLE"
 export YOUTUBE_SECRET_NAME="$YOUTUBE_SECRET_NAME"
 export JOB_ID="$JOB_ID"
 export LOG_LEVEL="$LOG_LEVEL"
@@ -193,7 +212,7 @@ export TASK_TOKEN="$TASK_TOKEN"
 
 # Run the renderer
 RESULT=0
-python3 -m src.renderer.main || RESULT=$?
+python3.12 -m src.renderer.main || RESULT=$?
 
 # =============================================================================
 # 6. Handle Completion

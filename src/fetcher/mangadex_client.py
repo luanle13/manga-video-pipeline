@@ -175,6 +175,97 @@ class MangaDexClient:
         logger.info("Trending manga fetched", extra={"count": len(manga_list)})
         return manga_list
 
+    def get_recently_updated_manga(self, limit: int = 20) -> list[dict]:
+        """
+        Get recently updated manga sorted by latest uploaded chapter.
+
+        Args:
+            limit: Maximum number of manga to return.
+
+        Returns:
+            List of raw manga data from API response.
+        """
+        logger.info("Fetching recently updated manga", extra={"limit": limit})
+
+        params = {
+            "order[latestUploadedChapter]": "desc",
+            "limit": limit,
+            "includes[]": "cover_art",
+            "hasAvailableChapters": "true",
+        }
+
+        response = self._request("GET", "/manga", params=params)
+        manga_list = response.get("data", [])
+
+        logger.info("Recently updated manga fetched", extra={"count": len(manga_list)})
+        return manga_list
+
+    def get_popular_manga(self, limit: int = 20) -> list[dict]:
+        """
+        Get popular manga sorted by rating.
+
+        Args:
+            limit: Maximum number of manga to return.
+
+        Returns:
+            List of raw manga data from API response.
+        """
+        logger.info("Fetching popular manga", extra={"limit": limit})
+
+        params = {
+            "order[rating]": "desc",
+            "limit": limit,
+            "includes[]": "cover_art",
+            "hasAvailableChapters": "true",
+        }
+
+        response = self._request("GET", "/manga", params=params)
+        manga_list = response.get("data", [])
+
+        logger.info("Popular manga fetched", extra={"count": len(manga_list)})
+        return manga_list
+
+    def get_combined_manga_list(self, limit_per_source: int = 10) -> list[dict]:
+        """
+        Get manga from multiple sources: trending, recently updated, and popular.
+
+        Combines results and removes duplicates while preserving order.
+
+        Args:
+            limit_per_source: Maximum manga to fetch from each source.
+
+        Returns:
+            List of unique manga data from all sources.
+        """
+        logger.info("Fetching manga from multiple sources", extra={"limit_per_source": limit_per_source})
+
+        seen_ids: set[str] = set()
+        combined: list[dict] = []
+
+        # Fetch from each source
+        sources = [
+            ("trending", self.get_trending_manga),
+            ("recently_updated", self.get_recently_updated_manga),
+            ("popular", self.get_popular_manga),
+        ]
+
+        for source_name, fetch_func in sources:
+            try:
+                manga_list = fetch_func(limit=limit_per_source)
+                for manga in manga_list:
+                    manga_id = manga.get("id", "")
+                    if manga_id and manga_id not in seen_ids:
+                        seen_ids.add(manga_id)
+                        combined.append(manga)
+            except Exception as e:
+                logger.warning(
+                    f"Failed to fetch {source_name} manga",
+                    extra={"source": source_name, "error": str(e)},
+                )
+
+        logger.info("Combined manga list created", extra={"total_unique": len(combined)})
+        return combined
+
     def get_manga_details(self, manga_id: str) -> MangaInfo:
         """
         Get detailed manga information.

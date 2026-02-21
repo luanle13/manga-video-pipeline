@@ -102,14 +102,15 @@ resource "aws_launch_template" "renderer" {
 
   # User data script - installs dependencies and runs renderer
   user_data = base64encode(templatefile("${path.module}/templates/renderer_userdata.sh.tpl", {
-    region                = local.region
-    project_name          = var.project_name
-    s3_bucket             = var.s3_assets_bucket_name
-    dynamodb_jobs_table   = var.dynamodb_jobs_table_name
-    youtube_secret_name   = var.youtube_credentials_secret_name
-    cleanup_function_name = var.cleanup_function_name
-    log_level             = var.log_level
-    activity_arn          = aws_sfn_activity.renderer.id
+    region                  = local.region
+    project_name            = var.project_name
+    s3_bucket               = var.s3_assets_bucket_name
+    dynamodb_jobs_table     = var.dynamodb_jobs_table_name
+    dynamodb_settings_table = var.dynamodb_settings_table_name
+    youtube_secret_name     = var.youtube_credentials_secret_name
+    cleanup_function_name   = var.cleanup_function_name
+    log_level               = var.log_level
+    activity_arn            = aws_sfn_activity.renderer.id
   }))
 
   # Instance tags

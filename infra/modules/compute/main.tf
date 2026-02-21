@@ -34,7 +34,7 @@ locals {
         AWS_REGION_NAME          = local.region
         S3_BUCKET                = var.s3_assets_bucket_name
         DYNAMODB_JOBS_TABLE      = var.dynamodb_jobs_table_name
-        DYNAMODB_PROCESSED_TABLE = var.dynamodb_processed_manga_table_name
+        DYNAMODB_MANGA_TABLE = var.dynamodb_processed_manga_table_name
         MANGADEX_SECRET_NAME     = var.mangadex_secret_name
         LOG_LEVEL                = var.log_level
       }
@@ -58,7 +58,7 @@ locals {
     tts_processor = {
       name        = "${var.project_name}-tts-processor"
       description = "Converts script text to Vietnamese audio using Edge TTS"
-      handler     = "src.tts.handler.handler"
+      handler     = "src.ttsgen.handler.handler"
       memory_size = 512
       timeout     = 900
       role_arn    = var.lambda_role_arns.tts_processor
@@ -87,14 +87,47 @@ locals {
     quota_checker = {
       name        = "${var.project_name}-quota-checker"
       description = "Checks daily YouTube upload quota before starting pipeline"
-      handler     = "src.quota.handler.handler"
+      handler     = "src.scheduler.quota_checker.handler"
       memory_size = 128
       timeout     = 30
       role_arn    = var.lambda_role_arns.quota_checker
       environment = {
         AWS_REGION_NAME         = local.region
+        S3_BUCKET               = var.s3_assets_bucket_name
         DYNAMODB_JOBS_TABLE     = var.dynamodb_jobs_table_name
         DYNAMODB_SETTINGS_TABLE = var.dynamodb_settings_table_name
+        LOG_LEVEL               = var.log_level
+      }
+    }
+    # Review Video Pipeline Lambdas
+    review_fetcher = {
+      name        = "${var.project_name}-review-fetcher"
+      description = "Fetches manga content from Vietnamese sites for review video"
+      handler     = "src.review_fetcher.handler.handler"
+      memory_size = 1024  # Higher memory for web scraping
+      timeout     = 900
+      role_arn    = var.lambda_role_arns.review_fetcher
+      environment = {
+        AWS_REGION_NAME         = local.region
+        S3_BUCKET               = var.s3_assets_bucket_name
+        DYNAMODB_JOBS_TABLE     = var.dynamodb_jobs_table_name
+        DYNAMODB_SETTINGS_TABLE = var.dynamodb_settings_table_name
+        LOG_LEVEL               = var.log_level
+      }
+    }
+    review_scriptgen = {
+      name        = "${var.project_name}-review-scriptgen"
+      description = "Generates Vietnamese review scripts using DeepInfra LLM"
+      handler     = "src.review_scriptgen.handler.handler"
+      memory_size = 512
+      timeout     = 900
+      role_arn    = var.lambda_role_arns.review_scriptgen
+      environment = {
+        AWS_REGION_NAME         = local.region
+        S3_BUCKET               = var.s3_assets_bucket_name
+        DYNAMODB_JOBS_TABLE     = var.dynamodb_jobs_table_name
+        DYNAMODB_SETTINGS_TABLE = var.dynamodb_settings_table_name
+        DEEPINFRA_SECRET_NAME   = var.deepinfra_api_key_secret_name
         LOG_LEVEL               = var.log_level
       }
     }

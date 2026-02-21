@@ -24,6 +24,8 @@ variable "lambda_role_arns" {
     tts_processor    = string
     quota_checker    = string
     cleanup          = string
+    review_fetcher   = string
+    review_scriptgen = string
   })
 }
 

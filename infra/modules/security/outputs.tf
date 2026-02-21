@@ -56,6 +56,26 @@ output "lambda_quota_checker_role_name" {
   value       = aws_iam_role.lambda_quota_checker.name
 }
 
+output "lambda_review_fetcher_role_arn" {
+  description = "ARN of the review fetcher Lambda execution role"
+  value       = aws_iam_role.lambda_review_fetcher.arn
+}
+
+output "lambda_review_fetcher_role_name" {
+  description = "Name of the review fetcher Lambda execution role"
+  value       = aws_iam_role.lambda_review_fetcher.name
+}
+
+output "lambda_review_scriptgen_role_arn" {
+  description = "ARN of the review script generator Lambda execution role"
+  value       = aws_iam_role.lambda_review_scriptgen.arn
+}
+
+output "lambda_review_scriptgen_role_name" {
+  description = "Name of the review script generator Lambda execution role"
+  value       = aws_iam_role.lambda_review_scriptgen.name
+}
+
 # =============================================================================
 # EC2 IAM Role ARNs and Instance Profiles
 # =============================================================================
@@ -140,6 +160,8 @@ output "lambda_role_arns" {
     tts_processor    = aws_iam_role.lambda_ttsgen.arn
     quota_checker    = aws_iam_role.lambda_quota_checker.arn
     cleanup          = aws_iam_role.lambda_cleanup.arn
+    review_fetcher   = aws_iam_role.lambda_review_fetcher.arn
+    review_scriptgen = aws_iam_role.lambda_review_scriptgen.arn
   }
 }
 
@@ -151,6 +173,8 @@ output "lambda_role_names" {
     tts_processor    = aws_iam_role.lambda_ttsgen.name
     quota_checker    = aws_iam_role.lambda_quota_checker.name
     cleanup          = aws_iam_role.lambda_cleanup.name
+    review_fetcher   = aws_iam_role.lambda_review_fetcher.name
+    review_scriptgen = aws_iam_role.lambda_review_scriptgen.name
   }
 }
 
@@ -238,6 +262,8 @@ output "security_summary" {
       tts_processor    = aws_iam_role.lambda_ttsgen.name
       quota_checker    = aws_iam_role.lambda_quota_checker.name
       cleanup          = aws_iam_role.lambda_cleanup.name
+      review_fetcher   = aws_iam_role.lambda_review_fetcher.name
+      review_scriptgen = aws_iam_role.lambda_review_scriptgen.name
     }
     ec2_roles = {
       renderer  = aws_iam_role.ec2_renderer.name

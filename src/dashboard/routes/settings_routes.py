@@ -54,6 +54,10 @@ class UpdateSettingsRequest(BaseModel):
     voice_id: str = Field(description="Edge TTS voice ID")
     tone: str = Field(description="Narration tone")
     script_style: str = Field(description="Script generation style")
+    manual_review_mode: bool = Field(
+        default=False,
+        description="Pause after rendering for manual review before upload",
+    )
     csrf_token: str = Field(description="CSRF token for request validation")
 
 
@@ -172,6 +176,7 @@ async def update_settings(
         voice_id=settings_update.voice_id,
         tone=settings_update.tone,
         script_style=settings_update.script_style,
+        manual_review_mode=settings_update.manual_review_mode,
     )
 
     # Update in DynamoDB

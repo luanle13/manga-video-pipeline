@@ -63,14 +63,8 @@ def main() -> None:
         # Step 2: Initialize config, logger, DB, S3
         logger.info("Initializing components")
         config = get_settings()
-        db_client = DynamoDBClient(
-            table_name=config.dynamodb_jobs_table,
-            region=config.aws_region,
-        )
-        s3_client = S3Client(
-            bucket_name=config.s3_bucket,
-            region=config.aws_region,
-        )
+        db_client = DynamoDBClient(settings=config)
+        s3_client = S3Client(settings=config)
 
         # Step 3: Register spot interruption handler
         register_spot_interruption_handler(
@@ -157,8 +151,13 @@ def main() -> None:
         panel_count = 0
 
         for chapter in panel_manifest.get("chapters", []):
-            for panel in chapter.get("panels", []):
-                panel_s3_key = panel.get("s3_key")
+            # Handle both formats: panel_keys (list of strings) and panels (list of objects)
+            panel_keys = chapter.get("panel_keys", [])
+            if not panel_keys:
+                # Fallback to panels format with s3_key
+                panel_keys = [p.get("s3_key") for p in chapter.get("panels", []) if p.get("s3_key")]
+
+            for panel_s3_key in panel_keys:
                 if not panel_s3_key:
                     continue
 
@@ -267,12 +266,28 @@ def main() -> None:
             extra={"s3_key": video_s3_key},
         )
 
-        # Step 16: Update job status to "completed"
-        db_client.update_job_status(
-            job_id=job_id,
-            status=JobStatus.completed,
-            progress_pct=100,
-        )
+        # Step 16: Check manual review mode setting
+        pipeline_settings = db_client.get_settings()
+        manual_review_mode = pipeline_settings.manual_review_mode if pipeline_settings else False
+
+        if manual_review_mode:
+            # Manual review mode: pause for user review before YouTube upload
+            logger.info(
+                "Manual review mode enabled, setting status to awaiting_review",
+                extra={"job_id": job_id},
+            )
+            db_client.update_job_status(
+                job_id=job_id,
+                status=JobStatus.awaiting_review,
+                progress_pct=85,
+            )
+        else:
+            # Auto mode: mark as completed (uploader will be triggered by Step Functions)
+            db_client.update_job_status(
+                job_id=job_id,
+                status=JobStatus.completed,
+                progress_pct=100,
+            )
 
         # Step 17: Delete checkpoint if it exists
         delete_checkpoint(job_id, s3_client)
@@ -286,7 +301,8 @@ def main() -> None:
             output = {
                 "job_id": job_id,
                 "video_s3_key": video_s3_key,
-                "status": "completed",
+                "status": "awaiting_review" if manual_review_mode else "completed",
+                "manual_review_mode": manual_review_mode,
             }
 
             sfn_client.send_task_success(
@@ -294,7 +310,10 @@ def main() -> None:
                 output=json.dumps(output),
             )
 
-            logger.info("Step Functions task signaled successfully")
+            logger.info(
+                "Step Functions task signaled successfully",
+                extra={"manual_review_mode": manual_review_mode},
+            )
 
         logger.info(
             "Video rendering completed successfully",
@@ -315,10 +334,7 @@ def main() -> None:
         if job_id:
             try:
                 config = get_settings()
-                db_client = DynamoDBClient(
-                    table_name=config.dynamodb_jobs_table,
-                    region=config.aws_region,
-                )
+                db_client = DynamoDBClient(settings=config)
                 db_client.update_job_status(
                     job_id=job_id,
                     status=JobStatus.failed,

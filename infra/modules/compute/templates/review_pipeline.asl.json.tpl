@@ -1,49 +1,11 @@
 {
-  "Comment": "Manga-to-Video Pipeline - Fetches manga, generates scripts/audio, renders video, uploads to YouTube",
-  "StartAt": "CheckQuota",
+  "Comment": "Review Video Pipeline - Scrapes manga sites, generates review scripts, renders video with Vietnamese narration",
+  "StartAt": "FetchReviewContent",
   "States": {
-    "CheckQuota": {
+    "FetchReviewContent": {
       "Type": "Task",
-      "Resource": "${quota_checker_arn}",
-      "Comment": "Check if daily video quota has been reached",
-      "ResultPath": "$.quotaCheck",
-      "Retry": [
-        {
-          "ErrorEquals": ["States.TaskFailed", "States.Timeout"],
-          "IntervalSeconds": 2,
-          "MaxAttempts": 3,
-          "BackoffRate": 2.0
-        }
-      ],
-      "Catch": [
-        {
-          "ErrorEquals": ["States.ALL"],
-          "ResultPath": "$.error",
-          "Next": "HandleError"
-        }
-      ],
-      "Next": "QuotaChoice"
-    },
-    "QuotaChoice": {
-      "Type": "Choice",
-      "Comment": "Determine if quota has been reached",
-      "Choices": [
-        {
-          "Variable": "$.quotaCheck.quota_reached",
-          "BooleanEquals": true,
-          "Next": "QuotaReached"
-        }
-      ],
-      "Default": "FetchManga"
-    },
-    "QuotaReached": {
-      "Type": "Succeed",
-      "Comment": "Daily quota reached, stop processing"
-    },
-    "FetchManga": {
-      "Type": "Task",
-      "Resource": "${fetcher_arn}",
-      "Comment": "Fetch manga chapters and download panel images",
+      "Resource": "${review_fetcher_arn}",
+      "Comment": "Fetch manga content from Vietnamese sites and extract chapter text",
       "ResultPath": "$.fetchResult",
       "TimeoutSeconds": 900,
       "Retry": [
@@ -61,50 +23,49 @@
           "Next": "HandleError"
         }
       ],
-      "Next": "FetchChoice"
+      "Next": "CheckFetchContinuation"
     },
-    "FetchChoice": {
+    "CheckFetchContinuation": {
       "Type": "Choice",
-      "Comment": "Check if manga was available and successfully processed",
+      "Comment": "Check if fetching needs continuation (for manga with many chapters)",
       "Choices": [
         {
-          "Variable": "$.fetchResult.status",
-          "StringEquals": "no_manga_available",
-          "Next": "NoMangaAvailable"
+          "Variable": "$.fetchResult.continuation_needed",
+          "BooleanEquals": true,
+          "Next": "PrepareFetchContinuation"
         },
         {
           "Variable": "$.fetchResult.status",
-          "StringEquals": "no_chapters_available",
-          "Next": "NoMangaAvailable"
-        },
-        {
-          "Variable": "$.fetchResult.status",
-          "StringEquals": "success",
-          "Next": "PrepareScriptInput"
+          "StringEquals": "error",
+          "Next": "HandleError"
         }
       ],
-      "Default": "NoMangaAvailable"
+      "Default": "PrepareScriptInput"
     },
-    "NoMangaAvailable": {
-      "Type": "Succeed",
-      "Comment": "No manga or chapters available to process"
+    "PrepareFetchContinuation": {
+      "Type": "Pass",
+      "Comment": "Prepare input for fetch continuation",
+      "Parameters": {
+        "job_id.$": "$.fetchResult.job_id",
+        "source_url.$": "$.fetchResult.source_url",
+        "chapter_offset.$": "$.fetchResult.next_chapter_offset"
+      },
+      "Next": "FetchReviewContent"
     },
     "PrepareScriptInput": {
       "Type": "Pass",
-      "Comment": "Prepare input for script generation",
+      "Comment": "Prepare input for review script generation",
       "Parameters": {
         "job_id.$": "$.fetchResult.job_id",
-        "manga_id.$": "$.fetchResult.manga_id",
         "manga_title.$": "$.fetchResult.manga_title",
-        "panel_manifest_s3_key.$": "$.fetchResult.panel_manifest_s3_key",
-        "quotaCheck.$": "$.quotaCheck"
+        "review_manifest_s3_key.$": "$.fetchResult.review_manifest_s3_key"
       },
-      "Next": "GenerateScript"
+      "Next": "GenerateReviewScript"
     },
-    "GenerateScript": {
+    "GenerateReviewScript": {
       "Type": "Task",
-      "Resource": "${scriptgen_arn}",
-      "Comment": "Generate Vietnamese narration script using LLM",
+      "Resource": "${review_scriptgen_arn}",
+      "Comment": "Generate Vietnamese review script using LLM",
       "ResultPath": "$.scriptResult",
       "TimeoutSeconds": 900,
       "Retry": [
@@ -131,16 +92,27 @@
         {
           "Variable": "$.scriptResult.continuation_needed",
           "BooleanEquals": true,
-          "Next": "GenerateScript"
+          "Next": "PrepareScriptContinuation"
         }
       ],
       "Default": "PrepareTTSInput"
     },
+    "PrepareScriptContinuation": {
+      "Type": "Pass",
+      "Comment": "Prepare input for script continuation",
+      "Parameters": {
+        "job_id.$": "$.scriptResult.job_id",
+        "manga_title.$": "$.manga_title",
+        "review_manifest_s3_key.$": "$.fetchResult.review_manifest_s3_key",
+        "chapter_offset.$": "$.scriptResult.next_chapter_offset"
+      },
+      "Next": "GenerateReviewScript"
+    },
     "PrepareTTSInput": {
       "Type": "Pass",
-      "Comment": "Prepare input for TTS generation (initial call with segment_offset = 0)",
+      "Comment": "Prepare input for TTS generation",
       "Parameters": {
-        "job_id.$": "$.job_id",
+        "job_id.$": "$.fetchResult.job_id",
         "script_s3_key.$": "$.scriptResult.script_s3_key",
         "segment_offset": 0
       },
@@ -185,9 +157,9 @@
     },
     "PrepareTTSContinuation": {
       "Type": "Pass",
-      "Comment": "Prepare input for TTS continuation with segment_offset from previous result",
+      "Comment": "Prepare input for TTS continuation",
       "Parameters": {
-        "job_id.$": "$.job_id",
+        "job_id.$": "$.fetchResult.job_id",
         "script_s3_key.$": "$.scriptResult.script_s3_key",
         "segment_offset.$": "$.ttsResult.next_segment_offset"
       },
@@ -200,7 +172,7 @@
       "Comment": "Store job_id in SSM for renderer instance",
       "Parameters": {
         "Name": "/${project_name}/renderer/current-job-id",
-        "Value.$": "$.job_id",
+        "Value.$": "$.fetchResult.job_id",
         "Type": "String",
         "Overwrite": true
       },
@@ -240,7 +212,7 @@
     "WaitForRender": {
       "Type": "Task",
       "Resource": "${renderer_activity_arn}",
-      "Comment": "Wait for rendering to complete (EC2 instance calls GetActivityTask then SendTaskSuccess)",
+      "Comment": "Wait for rendering to complete",
       "HeartbeatSeconds": 300,
       "TimeoutSeconds": 14400,
       "ResultPath": "$.renderResult",
@@ -249,8 +221,7 @@
           "ErrorEquals": ["States.Timeout", "States.HeartbeatTimeout"],
           "IntervalSeconds": 60,
           "MaxAttempts": 2,
-          "BackoffRate": 1.5,
-          "Comment": "Retry on timeout (Spot interruption)"
+          "BackoffRate": 1.5
         }
       ],
       "Catch": [
@@ -267,7 +238,7 @@
       "Resource": "${cleanup_arn}",
       "Comment": "Clean up temporary S3 artifacts",
       "Parameters": {
-        "job_id.$": "$.job_id"
+        "job_id.$": "$.fetchResult.job_id"
       },
       "ResultPath": "$.cleanupResult",
       "TimeoutSeconds": 300,
@@ -283,7 +254,6 @@
         {
           "ErrorEquals": ["States.ALL"],
           "ResultPath": "$.cleanupError",
-          "Comment": "Continue even if cleanup fails",
           "Next": "UpdateJobComplete"
         }
       ],
@@ -297,7 +267,7 @@
         "TableName": "${project_name}-jobs",
         "Key": {
           "job_id": {
-            "S.$": "$.job_id"
+            "S.$": "$.fetchResult.job_id"
           }
         },
         "UpdateExpression": "SET #status = :status, completed_at = :completed_at, progress_pct = :progress",
@@ -317,57 +287,59 @@
         }
       },
       "ResultPath": "$.updateResult",
-      "Next": "CheckMoreVideos"
-    },
-    "CheckMoreVideos": {
-      "Type": "Choice",
-      "Comment": "Check if we should process more videos (skip if single_video_mode)",
-      "Choices": [
-        {
-          "And": [
-            {
-              "Variable": "$.single_video_mode",
-              "IsPresent": true
-            },
-            {
-              "Variable": "$.single_video_mode",
-              "BooleanEquals": true
-            }
-          ],
-          "Next": "Done"
-        },
-        {
-          "And": [
-            {
-              "Variable": "$.quotaCheck.daily_count",
-              "IsPresent": true
-            },
-            {
-              "Variable": "$.quotaCheck.daily_count",
-              "NumericLessThanPath": "$.quotaCheck.daily_quota"
-            }
-          ],
-          "Next": "FetchManga"
-        }
-      ],
-      "Default": "Done"
+      "Next": "Done"
     },
     "HandleError": {
       "Type": "Choice",
       "Comment": "Check if job_id exists before updating DynamoDB",
       "Choices": [
         {
-          "Variable": "$.job_id",
+          "Variable": "$.fetchResult.job_id",
           "IsPresent": true,
           "Next": "UpdateJobFailed"
+        },
+        {
+          "Variable": "$.job_id",
+          "IsPresent": true,
+          "Next": "UpdateJobFailedFromInput"
         }
       ],
-      "Default": "LogErrorAndContinue"
+      "Default": "LogErrorAndFail"
     },
     "UpdateJobFailed": {
       "Type": "Task",
       "Resource": "arn:aws:states:::dynamodb:updateItem",
       "Comment": "Update job to failed status",
+      "Parameters": {
+        "TableName": "${project_name}-jobs",
+        "Key": {
+          "job_id": {
+            "S.$": "$.fetchResult.job_id"
+          }
+        },
+        "UpdateExpression": "SET #status = :status, error_message = :error, failed_at = :failed_at",
+        "ExpressionAttributeNames": {
+          "#status": "status"
+        },
+        "ExpressionAttributeValues": {
+          ":status": {
+            "S": "failed"
+          },
+          ":error": {
+            "S.$": "States.Format('Error in state {}: {}', $$.State.Name, $.error.Cause)"
+          },
+          ":failed_at": {
+            "S.$": "$$.State.EnteredTime"
+          }
+        }
+      },
+      "ResultPath": "$.errorResult",
+      "Next": "FailExecution"
+    },
+    "UpdateJobFailedFromInput": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::dynamodb:updateItem",
+      "Comment": "Update job to failed status using input job_id",
       "Parameters": {
         "TableName": "${project_name}-jobs",
         "Key": {
@@ -392,18 +364,24 @@
         }
       },
       "ResultPath": "$.errorResult",
-      "Next": "CheckMoreVideos"
+      "Next": "FailExecution"
     },
-    "LogErrorAndContinue": {
+    "LogErrorAndFail": {
       "Type": "Pass",
-      "Comment": "No job_id exists, just log and continue",
-      "Result": {"logged": true},
+      "Comment": "No job_id exists, log and fail",
+      "Result": {"logged": true, "error": "No job_id available"},
       "ResultPath": "$.errorResult",
-      "Next": "Done"
+      "Next": "FailExecution"
+    },
+    "FailExecution": {
+      "Type": "Fail",
+      "Comment": "Review pipeline failed",
+      "Error": "ReviewPipelineError",
+      "Cause": "Review video pipeline encountered an error"
     },
     "Done": {
       "Type": "Succeed",
-      "Comment": "Pipeline completed successfully"
+      "Comment": "Review pipeline completed successfully"
     }
   }
 }

@@ -128,24 +128,24 @@ def count_todays_jobs(db_client: DynamoDBClient, today: str) -> int:
     # but won't scale well. GSI would allow Query instead of Scan.
 
     count = 0
-    # Get low-level client from resource for scanning
-    client = db_client._dynamodb.meta.client
-    paginator = client.get_paginator("scan")
 
-    # Scan all jobs (inefficient but works for MVP)
-    table_name = db_client._settings.dynamodb_jobs_table
-    for page in paginator.paginate(TableName=table_name):
-        items = page.get("Items", [])
+    # Use high-level Table.scan() which returns deserialized items
+    table = db_client._jobs_table
+    scan_kwargs = {}
+
+    while True:
+        response = table.scan(**scan_kwargs)
+        items = response.get("Items", [])
 
         for item in items:
-            # Parse created_at timestamp
-            created_at_str = item.get("created_at", {}).get("S", "")
+            # Parse created_at timestamp (high-level API returns plain values)
+            created_at_str = item.get("created_at", "")
             if not created_at_str:
                 continue
 
             try:
                 # Parse ISO timestamp and convert to Vietnam timezone
-                created_at_utc = datetime.fromisoformat(created_at_str.replace("Z", "+00:00"))
+                created_at_utc = datetime.fromisoformat(str(created_at_str).replace("Z", "+00:00"))
                 created_at_vietnam = created_at_utc.astimezone(VIETNAM_TZ)
                 created_date = created_at_vietnam.date().isoformat()
 
@@ -154,19 +154,19 @@ def count_todays_jobs(db_client: DynamoDBClient, today: str) -> int:
                     continue
 
                 # Check status (only count active jobs, not failed)
-                status_str = item.get("status", {}).get("S", "")
+                status_str = item.get("status", "")
                 if not status_str:
                     continue
 
                 # Convert string to JobStatus enum for comparison
                 try:
-                    job_status = JobStatus(status_str)
+                    job_status = JobStatus(str(status_str))
                     if job_status in QUOTA_STATUSES:
                         count += 1
                         logger.debug(
                             "Counted job toward quota",
                             extra={
-                                "job_id": item.get("job_id", {}).get("S", "unknown"),
+                                "job_id": item.get("job_id", "unknown"),
                                 "status": status_str,
                                 "created_at": created_at_str,
                             },
@@ -176,7 +176,7 @@ def count_todays_jobs(db_client: DynamoDBClient, today: str) -> int:
                     logger.warning(
                         "Invalid job status encountered",
                         extra={
-                            "job_id": item.get("job_id", {}).get("S", "unknown"),
+                            "job_id": item.get("job_id", "unknown"),
                             "status": status_str,
                         },
                     )
@@ -187,11 +187,17 @@ def count_todays_jobs(db_client: DynamoDBClient, today: str) -> int:
                 logger.warning(
                     "Failed to parse job created_at timestamp",
                     extra={
-                        "job_id": item.get("job_id", {}).get("S", "unknown"),
+                        "job_id": item.get("job_id", "unknown"),
                         "created_at": created_at_str,
                         "error": str(e),
                     },
                 )
                 continue
+
+        # Check for pagination
+        if "LastEvaluatedKey" in response:
+            scan_kwargs["ExclusiveStartKey"] = response["LastEvaluatedKey"]
+        else:
+            break
 
     return count

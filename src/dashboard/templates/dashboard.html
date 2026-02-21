@@ -3,7 +3,12 @@
 {% block title %}Dashboard - Manga Video Pipeline{% endblock %}
 
 {% block content %}
-<h1>Dashboard</h1>
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+    <h1 style="margin: 0;">Dashboard</h1>
+    <button id="triggerPipelineBtn" onclick="triggerPipeline()" class="btn-success">
+        Generate New Video
+    </button>
+</div>
 
 <!-- Stats Cards -->
 <div class="stats-grid">
@@ -68,6 +73,47 @@
 {% block scripts %}
 <script>
     let refreshInterval;
+
+    // CSRF token from server
+    const csrfToken = '{{ csrf_token }}';
+
+    // Trigger pipeline manually
+    async function triggerPipeline() {
+        if (!confirm('Start a new video generation? This will fetch a trending manga and process it through the pipeline.')) {
+            return;
+        }
+
+        const btn = document.getElementById('triggerPipelineBtn');
+        btn.disabled = true;
+        btn.textContent = 'Starting...';
+
+        try {
+            const formData = new FormData();
+            formData.append('csrf_token', csrfToken);
+
+            const response = await fetch('/api/trigger-pipeline', {
+                method: 'POST',
+                body: formData,
+                credentials: 'include'
+            });
+
+            const data = await response.json();
+
+            if (response.ok) {
+                showToast('Pipeline started successfully! Check the Queue for progress.', 'success');
+                // Refresh data to show new job
+                setTimeout(refreshData, 2000);
+            } else {
+                showToast(data.detail || 'Failed to start pipeline', 'error');
+            }
+        } catch (error) {
+            console.error('Error triggering pipeline:', error);
+            showToast('Failed to start pipeline', 'error');
+        } finally {
+            btn.disabled = false;
+            btn.textContent = 'Generate New Video';
+        }
+    }
 
     // Load recent jobs
     async function loadRecentJobs() {

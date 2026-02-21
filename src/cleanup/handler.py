@@ -67,17 +67,15 @@ def handler(event: dict, context: Any) -> dict:
         },
     )
 
-    # Step 4: Update job record with cleanup_at field
+    # Step 4: Update job record with cleanup_at field and mark manga as processed
     try:
         # Get current job to update it
         job = db_client.get_job(job_id)
         if job:
             # Update the job record with cleanup timestamp
-            # We'll add this as an update to the job record
             cleanup_at = datetime.now(UTC)
 
             # Update using the DynamoDB client directly
-            # Since there's no specific method for cleanup_at, we'll use the client directly
             db_client._client.update_item(
                 TableName=db_client._table_name,
                 Key={"job_id": {"S": job_id}},
@@ -92,6 +90,18 @@ def handler(event: dict, context: Any) -> dict:
                 "Job record updated with cleanup timestamp",
                 extra={"job_id": job_id, "cleanup_at": cleanup_at.isoformat()},
             )
+
+            # Step 4b: Mark manga as processed (only after successful pipeline completion)
+            # This prevents re-processing the same manga, but only if the entire pipeline succeeded
+            if job.manga_id and job.manga_title:
+                db_client.mark_manga_processed(
+                    manga_id=job.manga_id,
+                    title=job.manga_title,
+                )
+                logger.info(
+                    "Manga marked as processed",
+                    extra={"manga_id": job.manga_id, "title": job.manga_title},
+                )
         else:
             logger.warning(
                 "Job not found in database, skipping record update",
@@ -100,7 +110,7 @@ def handler(event: dict, context: Any) -> dict:
     except Exception as e:
         # Log error but don't fail the cleanup - cleanup already succeeded
         logger.warning(
-            "Failed to update job record with cleanup timestamp",
+            "Failed to update job record or mark manga as processed",
             extra={"job_id": job_id, "error": str(e)},
         )
 

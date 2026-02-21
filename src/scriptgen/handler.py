@@ -166,6 +166,7 @@ def handler(event: dict, context: Any) -> dict:
             "script_s3_key": script_s3_key,
             "total_segments": len(script_document.segments),
             "estimated_duration_minutes": round(estimated_duration, 2),
+            "continuation_needed": False,
         }
 
     except Exception as e:

@@ -81,6 +81,34 @@ resource "aws_cloudwatch_log_group" "quota_checker" {
   )
 }
 
+resource "aws_cloudwatch_log_group" "review_fetcher" {
+  name              = "/aws/lambda/${local.lambda_functions.review_fetcher.name}"
+  retention_in_days = var.log_retention_days
+
+  tags = merge(
+    local.common_tags,
+    {
+      Name      = "${local.lambda_functions.review_fetcher.name}-logs"
+      Component = "lambda"
+      Function  = "review-fetcher"
+    }
+  )
+}
+
+resource "aws_cloudwatch_log_group" "review_scriptgen" {
+  name              = "/aws/lambda/${local.lambda_functions.review_scriptgen.name}"
+  retention_in_days = var.log_retention_days
+
+  tags = merge(
+    local.common_tags,
+    {
+      Name      = "${local.lambda_functions.review_scriptgen.name}-logs"
+      Component = "lambda"
+      Function  = "review-scriptgen"
+    }
+  )
+}
+
 # =============================================================================
 # 1. Manga Fetcher Lambda
 # =============================================================================
@@ -341,6 +369,110 @@ resource "aws_lambda_function" "quota_checker" {
       Component = "lambda"
       Function  = "quota-checker"
       Stage     = "pre-check"
+    }
+  )
+
+  lifecycle {
+    ignore_changes = [
+      s3_key,
+      source_code_hash,
+    ]
+  }
+}
+
+# =============================================================================
+# 6. Review Fetcher Lambda
+# =============================================================================
+# Fetches manga content from Vietnamese sites for review video generation.
+# Memory: 1024 MB (web scraping with BeautifulSoup)
+# Timeout: 15 minutes (multiple chapters to scrape)
+
+resource "aws_lambda_function" "review_fetcher" {
+  function_name = local.lambda_functions.review_fetcher.name
+  description   = local.lambda_functions.review_fetcher.description
+  role          = local.lambda_functions.review_fetcher.role_arn
+
+  # Deployment package from S3
+  s3_bucket = var.lambda_deployment_bucket
+  s3_key    = "${var.lambda_deployment_prefix}/review-fetcher-${var.lambda_package_version}.zip"
+
+  # Runtime configuration
+  runtime       = var.lambda_runtime
+  architectures = [var.lambda_architecture]
+  handler       = local.lambda_functions.review_fetcher.handler
+
+  # Resource limits
+  memory_size = local.lambda_functions.review_fetcher.memory_size
+  timeout     = local.lambda_functions.review_fetcher.timeout
+
+  # Environment variables
+  environment {
+    variables = local.lambda_functions.review_fetcher.environment
+  }
+
+  # Ensure log group exists before function
+  depends_on = [aws_cloudwatch_log_group.review_fetcher]
+
+  tags = merge(
+    local.common_tags,
+    {
+      Name      = local.lambda_functions.review_fetcher.name
+      Component = "lambda"
+      Function  = "review-fetcher"
+      Stage     = "fetching"
+      Pipeline  = "review"
+    }
+  )
+
+  lifecycle {
+    ignore_changes = [
+      s3_key,
+      source_code_hash,
+    ]
+  }
+}
+
+# =============================================================================
+# 7. Review Script Generator Lambda
+# =============================================================================
+# Generates Vietnamese review scripts using DeepInfra LLM.
+# Memory: 512 MB (LLM API calls)
+# Timeout: 15 minutes (multiple LLM calls for chapter summaries)
+
+resource "aws_lambda_function" "review_scriptgen" {
+  function_name = local.lambda_functions.review_scriptgen.name
+  description   = local.lambda_functions.review_scriptgen.description
+  role          = local.lambda_functions.review_scriptgen.role_arn
+
+  # Deployment package from S3
+  s3_bucket = var.lambda_deployment_bucket
+  s3_key    = "${var.lambda_deployment_prefix}/review-scriptgen-${var.lambda_package_version}.zip"
+
+  # Runtime configuration
+  runtime       = var.lambda_runtime
+  architectures = [var.lambda_architecture]
+  handler       = local.lambda_functions.review_scriptgen.handler
+
+  # Resource limits
+  memory_size = local.lambda_functions.review_scriptgen.memory_size
+  timeout     = local.lambda_functions.review_scriptgen.timeout
+
+  # Environment variables
+  environment {
+    variables = local.lambda_functions.review_scriptgen.environment
+  }
+
+  # Ensure log group exists before function
+  depends_on = [aws_cloudwatch_log_group.review_scriptgen]
+
+  tags = merge(
+    local.common_tags,
+    {
+      Name      = local.lambda_functions.review_scriptgen.name
+      Component = "lambda"
+      Function  = "review-scriptgen"
+      Stage     = "scripting"
+      Pipeline  = "review"
     }
   )
 

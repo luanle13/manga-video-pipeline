@@ -1,8 +1,10 @@
 """FastAPI application for manga video pipeline admin dashboard."""
 
+import os
 import secrets
 from pathlib import Path
 
+import boto3
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -17,6 +19,7 @@ from src.dashboard.routes import (
     auth_routes,
     manga_routes,
     queue_routes,
+    review_routes,
     settings_routes,
     stats_routes,
 )
@@ -76,7 +79,20 @@ def create_app(
     app.state.admin_secret_name = admin_secret_name
     app.state.csrf_manager = csrf_manager
     app.state.secure_cookies = secure_cookies
-    app.state.state_machine_arn = state_machine_arn or f"arn:aws:states:{settings.aws_region}:123456789012:stateMachine:manga-pipeline"
+    # Get state machine ARN - either from parameter, env var, or construct dynamically
+    if state_machine_arn:
+        app.state.state_machine_arn = state_machine_arn
+    elif os.environ.get("STATE_MACHINE_ARN"):
+        app.state.state_machine_arn = os.environ["STATE_MACHINE_ARN"]
+    else:
+        # Get account ID dynamically
+        try:
+            sts_client = boto3.client("sts", region_name=settings.aws_region)
+            account_id = sts_client.get_caller_identity()["Account"]
+            app.state.state_machine_arn = f"arn:aws:states:{settings.aws_region}:{account_id}:stateMachine:manga-video-pipeline-pipeline"
+        except Exception as e:
+            logger.warning(f"Could not get account ID: {e}. Using placeholder.")
+            app.state.state_machine_arn = f"arn:aws:states:{settings.aws_region}:000000000000:stateMachine:manga-video-pipeline-pipeline"
 
     # Set up Jinja2 templates
     templates_dir = Path(__file__).parent / "templates"
@@ -89,6 +105,7 @@ def create_app(
     queue_routes.set_templates(templates)
     stats_routes.set_templates(templates)
     manga_routes.set_templates(templates)
+    review_routes.set_templates(templates)
 
     # Mount static files
     static_dir = Path(__file__).parent / "static"
@@ -109,6 +126,7 @@ def create_app(
     app.include_router(settings_routes.router)
     app.include_router(queue_routes.router)
     app.include_router(manga_routes.router)
+    app.include_router(review_routes.router)
 
     logger.info(
         "FastAPI application created",

@@ -1,5 +1,6 @@
 """Queue management routes for admin dashboard."""
 
+import json
 from typing import Literal
 
 import boto3
@@ -12,6 +13,7 @@ from src.common.config import get_settings
 from src.common.db import DynamoDBClient
 from src.common.logging_config import setup_logger
 from src.common.models import JobStatus
+from src.common.storage import S3Client
 from src.dashboard.auth import get_current_user
 
 logger = setup_logger(__name__)
@@ -128,8 +130,8 @@ async def get_queue(
         if status_filter:
             all_jobs = [job for job in all_jobs if job.status == status_filter]
 
-        # Sort by created_at descending (newest first)
-        all_jobs.sort(key=lambda j: j.created_at, reverse=True)
+        # Sort by updated_at descending (most recently updated first)
+        all_jobs.sort(key=lambda j: j.updated_at, reverse=True)
 
         # Calculate pagination
         total = len(all_jobs)
@@ -292,11 +294,11 @@ async def retry_job(
 
         sfn_client = boto3.client("stepfunctions", region_name=region)
 
-        # Start execution
+        # Start execution with single_video_mode to process only this job
         response = sfn_client.start_execution(
             stateMachineArn=state_machine_arn,
             name=f"retry-{job_id}",
-            input=f'{{"job_id": "{job_id}"}}',
+            input=f'{{"job_id": "{job_id}", "single_video_mode": true}}',
         )
 
         execution_arn = response["executionArn"]
@@ -330,4 +332,255 @@ async def retry_job(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to retry job: {str(e)}",
+        )
+
+
+@router.get("/api/queue/{job_id}/video-url")
+async def get_video_download_url(
+    job_id: str,
+    db_client: DynamoDBClient = Depends(get_db_client),
+):
+    """
+    Get presigned S3 URL for downloading the rendered video.
+
+    Only available for jobs in awaiting_review or completed status.
+
+    Args:
+        job_id: Job ID.
+        db_client: DynamoDB client.
+
+    Returns:
+        Presigned download URL and expiration time.
+
+    Raises:
+        HTTPException: 404 if job not found, 400 if video not available.
+    """
+    job = db_client.get_job(job_id)
+
+    if not job:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Job {job_id} not found",
+        )
+
+    # Only allow download for jobs that have completed rendering
+    allowed_statuses = [JobStatus.rendering, JobStatus.awaiting_review, JobStatus.completed, JobStatus.uploading]
+    if job.status not in allowed_statuses:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Video download only available for jobs that have completed rendering (current: {job.status})",
+        )
+
+    try:
+        settings = get_settings()
+        s3_client = S3Client(settings)
+
+        video_key = f"jobs/{job_id}/video.mp4"
+
+        # Check if video exists
+        if not s3_client.file_exists(video_key):
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Video file not found for job {job_id}",
+            )
+
+        # Generate presigned URL (1 hour expiry)
+        presigned_url = s3_client.get_presigned_url(video_key, expires_in=3600)
+
+        logger.info(
+            "Video download URL generated",
+            extra={"job_id": job_id},
+        )
+
+        return {
+            "download_url": presigned_url,
+            "expires_in_seconds": 3600,
+            "filename": f"{job.manga_title.replace(' ', '_')}_{job_id[:8]}.mp4",
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(
+            "Failed to generate video download URL",
+            extra={"job_id": job_id, "error": str(e)},
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to generate download URL: {str(e)}",
+        )
+
+
+@router.post("/api/queue/{job_id}/upload")
+async def trigger_youtube_upload(
+    request: Request,
+    job_id: str,
+    csrf_token: str = Form(...),
+    username: str = Depends(get_current_user),
+    db_client: DynamoDBClient = Depends(get_db_client),
+):
+    """
+    Manually trigger YouTube upload for a job in awaiting_review status.
+
+    Args:
+        request: FastAPI request.
+        job_id: Job ID to upload.
+        csrf_token: CSRF token from form.
+        username: Authenticated username.
+        db_client: DynamoDB client.
+
+    Returns:
+        JSON with success message.
+
+    Raises:
+        HTTPException: 403 if CSRF invalid, 404 if job not found,
+                      400 if job not in awaiting_review status.
+    """
+    # Verify CSRF token
+    if not request.app.state.csrf_manager.verify_token(csrf_token):
+        logger.warning(
+            "YouTube upload trigger failed: invalid CSRF token",
+            extra={"username": username, "job_id": job_id},
+        )
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Invalid CSRF token",
+        )
+
+    job = db_client.get_job(job_id)
+
+    if not job:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Job {job_id} not found",
+        )
+
+    if job.status != JobStatus.awaiting_review:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Upload only available for jobs awaiting review (current: {job.status})",
+        )
+
+    try:
+        # Update status to uploading
+        db_client.update_job_status(
+            job_id=job_id,
+            status=JobStatus.uploading,
+            progress_pct=90,
+        )
+
+        # Invoke uploader Lambda asynchronously
+        settings = get_settings()
+        lambda_client = boto3.client("lambda", region_name=settings.aws_region)
+
+        lambda_client.invoke(
+            FunctionName=f"manga-video-pipeline-uploader",
+            InvocationType="Event",  # Async invocation
+            Payload=json.dumps({"job_id": job_id}).encode(),
+        )
+
+        logger.info(
+            "YouTube upload triggered",
+            extra={"username": username, "job_id": job_id},
+        )
+
+        return {
+            "message": "YouTube upload initiated",
+            "job_id": job_id,
+        }
+
+    except Exception as e:
+        # Revert status on error
+        db_client.update_job_status(
+            job_id=job_id,
+            status=JobStatus.awaiting_review,
+            progress_pct=85,
+        )
+        logger.error(
+            "Failed to trigger YouTube upload",
+            extra={"username": username, "job_id": job_id, "error": str(e)},
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to trigger upload: {str(e)}",
+        )
+
+
+@router.post("/api/queue/{job_id}/skip-upload")
+async def skip_youtube_upload(
+    request: Request,
+    job_id: str,
+    csrf_token: str = Form(...),
+    username: str = Depends(get_current_user),
+    db_client: DynamoDBClient = Depends(get_db_client),
+):
+    """
+    Skip YouTube upload and mark job as completed.
+
+    Video remains in S3 but is not uploaded to YouTube.
+
+    Args:
+        request: FastAPI request.
+        job_id: Job ID.
+        csrf_token: CSRF token from form.
+        username: Authenticated username.
+        db_client: DynamoDB client.
+
+    Returns:
+        JSON with success message.
+
+    Raises:
+        HTTPException: 403 if CSRF invalid, 404 if job not found,
+                      400 if job not in awaiting_review status.
+    """
+    # Verify CSRF token
+    if not request.app.state.csrf_manager.verify_token(csrf_token):
+        logger.warning(
+            "Skip upload failed: invalid CSRF token",
+            extra={"username": username, "job_id": job_id},
+        )
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Invalid CSRF token",
+        )
+
+    job = db_client.get_job(job_id)
+
+    if not job:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Job {job_id} not found",
+        )
+
+    if job.status != JobStatus.awaiting_review:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Skip only available for jobs awaiting review (current: {job.status})",
+        )
+
+    try:
+        db_client.update_job_status(
+            job_id=job_id,
+            status=JobStatus.completed,
+            progress_pct=100,
+        )
+
+        logger.info(
+            "YouTube upload skipped",
+            extra={"username": username, "job_id": job_id},
+        )
+
+        return {
+            "message": "Upload skipped, job marked as completed",
+            "job_id": job_id,
+        }
+
+    except Exception as e:
+        logger.error(
+            "Failed to skip upload",
+            extra={"username": username, "job_id": job_id, "error": str(e)},
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to skip upload: {str(e)}",
         )

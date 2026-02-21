@@ -295,7 +295,7 @@ class DynamoDBClient:
         Returns:
             Pipeline settings (defaults if not found).
         """
-        response = self._settings_table.get_item(Key={"setting_id": SETTINGS_PK})
+        response = self._settings_table.get_item(Key={"setting_key": SETTINGS_PK})
         item = response.get("Item")
 
         if not item:
@@ -303,7 +303,7 @@ class DynamoDBClient:
             return PipelineSettings()
 
         # Remove the partition key before creating PipelineSettings
-        item.pop("setting_id", None)
+        item.pop("setting_key", None)
         item.pop("updated_at", None)
 
         logger.debug("Settings retrieved")
@@ -318,7 +318,7 @@ class DynamoDBClient:
         """
         now = utcnow()
         item = settings.model_dump()
-        item["setting_id"] = SETTINGS_PK
+        item["setting_key"] = SETTINGS_PK
         item["updated_at"] = now.isoformat()
 
         self._settings_table.put_item(Item=item)
